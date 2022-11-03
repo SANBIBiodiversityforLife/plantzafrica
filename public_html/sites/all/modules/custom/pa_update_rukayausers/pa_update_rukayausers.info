@@ -1,0 +1,5 @@
+name = Plantz Africa Contributor User updater
+description = A custom module updating some users to contributors
+package = Greenbox
+core = 7.x
+files[] = tests/pa_update_rukayausers.test

@@ -1,0 +1,6 @@
+name = Plantz Africa - Fivestar contrib widget
+description = Custom fivestar widget set used for POW ratings
+package = Voting
+core = 7.x
+dependencies[] = votingapi
+dependencies[] = fivestar

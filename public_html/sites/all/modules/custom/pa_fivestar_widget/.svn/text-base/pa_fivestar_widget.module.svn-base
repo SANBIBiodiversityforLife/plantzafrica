@@ -1,0 +1,75 @@
+<?php
+
+/**
+ * @file pa_fivestar_widget.module
+ * @description adds a new Fivestar voting widget set via the Fivestar API
+ */
+function pa_fivestar_widget_fivestar_widgets(){
+
+  $widgets_directory = drupal_get_path('module', 'pa_fivestar_widget') .'/widgets/pows';
+  $files = file_scan_directory($widgets_directory, '/.*\.css$/');
+
+  $widgets = array();
+
+  foreach ($files as $file) {
+    if (strpos($file->filename, '-rtl.css') === FALSE) {
+      $widgets[$file->uri] = drupal_ucfirst($file->name);
+    }
+  }
+
+  return $widgets;
+}
+
+/**
+ * Function to display voting form within the custom node template
+ */
+function pa_fivestar_widget_get_forms($node){
+
+  $settings['article'] = array(
+    'entity_type' => 'node',
+    'content_type' => 'plant',
+    'content_id' => $node->nid,
+    'entity' => $node,
+    'stars' => 5,
+    'field_name' => 'field_rating_article',
+    'autosubmit' => TRUE,
+    'allow_clear' => TRUE,
+    'allow_revote' => FALSE,
+    'allow_ownvote' => TRUE,
+    'description' => '',
+    'langcode' => LANGUAGE_NONE,
+    'text' => 'none',
+    'tag' => 'vote',
+    'style' => 'average',
+    'widget' => array( 'name' => 'pows', 'css' => drupal_get_path('module', 'pa_fivestar_widget') . '/widgets/pows/pows.css' )
+  );
+
+  $settings['plant'] = array(
+    'entity_type' => 'node',
+    'content_type' => 'plant',
+    'content_id' => $node->nid,
+    'entity' => $node,
+    'stars' => 5,
+    'field_name' => 'field_rating_plant',
+    'autosubmit' => TRUE,
+    'allow_clear' => TRUE,
+    'allow_revote' => FALSE,
+    'allow_ownvote' => TRUE,
+    'description' => '',
+    'langcode' => LANGUAGE_NONE,
+    'text' => 'none',
+    'tag' => 'plant',
+    'style' => 'average',
+    'widget' => array( 'name' => 'pows', 'css' => drupal_get_path('module', 'pa_fivestar_widget') . '/widgets/pows/pows.css' )
+  );
+
+  global $user;
+  $votes['plant'] = fivestar_get_votes('node', $node->nid, 'plant', $user->uid);
+  $votes['article'] = fivestar_get_votes('node', $node->nid, 'vote', $user->uid);
+
+  $forms['plant'] = drupal_get_form('fivestar_custom_widget', $votes['plant'], $settings['plant']);
+  $forms['article'] = drupal_get_form('fivestar_custom_widget', $votes['article'], $settings['article']);
+  $forms['votes'] = $votes;
+
+  return ($forms);
+}

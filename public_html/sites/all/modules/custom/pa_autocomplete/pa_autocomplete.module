@@ -1,0 +1,32 @@
+<?php
+
+/**
+ * @file pa_autocomplete.module
+ * TODO: Enter file description here.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function pa_autocomplete_menu() {
+
+  $items = array();
+
+  //Plants autocomplete
+  $items['pa/autocomplete/plants'] = array(
+    'page callback' => 'pa_autocomplete_get_plants',
+    'file' => 'includes/pa_autocomplete.json.inc',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK
+  );
+
+  //General autocomplete
+  $items['pa/autocomplete/general'] = array(
+    'page callback' => 'pa_autocomplete_get_general',
+    'file' => 'includes/pa_autocomplete.json.inc',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK
+  );
+
+  return $items;
+}

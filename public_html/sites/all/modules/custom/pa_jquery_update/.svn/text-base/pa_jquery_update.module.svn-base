@@ -1,0 +1,43 @@
+<?php
+
+/**
+ * @file pa_jquery_update.module
+ * custom module which replaces legacy jquery versions with latest ones
+ */
+
+
+/**
+ * Implements hook_js_alter().
+ */
+function pa_jquery_update_js_alter(&$javascript) {
+
+  global $theme_key;
+
+  //krumo($javascript);
+
+  //if not admin theme or admin path
+  if(!path_is_admin(current_path()) && $theme_key !== variable_get('admin_theme', 'seven')){
+
+    // Swap out jQuery to use an updated version of the jQuery library.
+    $javascript['misc/jquery.js']['data'] = drupal_get_path('module', 'pa_jquery_update') . '/scripts/jquery-1.10.1.min.js';
+    $javascript['misc/jquery.js']['version'] = '1.10.1';
+
+    if(!isset($javascript['misc/ui/jquery.ui.core.min.js'])){
+      drupal_add_library('system', 'ui');
+    }
+
+    $javascript['misc/ui/jquery.ui.core.min.js']['data'] = drupal_get_path('module', 'pa_jquery_update') . '/scripts/jquery-ui-1.10.4.custom.min.js';
+    $javascript['misc/ui/jquery.ui.core.min.js']['version'] = '1.10.4';
+    $javascript['misc/ui/jquery.ui.core.min.js']['scope'] = 'header';
+
+    //remove legacy scripts
+    unset($javascript['misc/ui/jquery.ui.datepicker.min.js']);
+
+    // Swap out jQuery to use an updated version of the jQuery Form script.
+    if(isset($javascript['misc/jquery.form.js'])){
+      $javascript['misc/jquery.form.js']['data'] = drupal_get_path('module', 'pa_jquery_update') . '/scripts/jquery.form.js';
+      $javascript['misc/jquery.form.js']['version'] = '3.44';
+    }
+  }
+}
+

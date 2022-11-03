@@ -1,0 +1,58 @@
+@charset "utf-8";
+.insert-controls{
+  padding:10px;
+  clear:both;
+}
+.insert-controls.clear:after{
+  content:".";
+  display:block;
+  clear:both;
+  visibility:hidden;
+  line-height:0;
+  height:0
+}
+.insert-controls .insert-snap-container, .insert-controls .insert-button{
+  float:left;
+}
+.insert-controls .insert-snap-container input{
+  float:left;
+  margin: 7px 5px 0 10px;
+}
+.insert-controls .insert-snap-container label{
+  float:left;
+  padding-top:4px;
+}
+.insert-toolbar{
+  background-color:white;
+  position:fixed;
+  bottom:0;
+  padding:10px;
+  z-index: 999;
+  border:1px solid #eee;
+  border-radius:6px;
+  -moz-box-shadow:    0 3px 5px 3px #ccc;
+  -webkit-box-shadow: 0 3px 5px 3px #ccc;
+  box-shadow:         0 3px 5px 3px #ccc;
+}
+
+.backtop-btn{ 
+   margin-top:20px;
+   float:right; 
+   display:block; 
+   clear:both; 
+   width:auto; 
+   color:#5f5d5d; 
+   font-size:12px; 
+   line-height:30px; 
+   font-family:'proxima_nova_rgregular'; 
+   padding:0 39px 0 37px; 
+   background:url(../../../../themes/greenbox/images/backtop-bg.jpg) repeat-x left top; 
+   border:1px solid #bdbdbd; 
+   text-decoration:none;
+   border-radius:2px;
+   -moz-border-radius:2px;
+   -webkit-border-radius:2px;
+}
+.backtop-btn:hover {
+   background:#dbdbdb;
+}

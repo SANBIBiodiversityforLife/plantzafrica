@@ -1,0 +1,17 @@
+name = Menus
+description = Implements our menus and menu blocks for Plantz Africa
+core = 7.x
+package = Menus
+dependencies[] = fe_block
+dependencies[] = features
+dependencies[] = menu
+features[fe_block_settings][] = menu-menu-vegetation-menu
+features[fe_block_settings][] = system-main-menu
+features[features_api][] = api:2
+features[menu_custom][] = main-menu
+features[menu_custom][] = menu-vegetation-menu
+features[menu_links][] = main-menu_about:node/12621
+features[menu_links][] = main-menu_contact:node/12620
+features[menu_links][] = main-menu_home:<front>
+features[menu_links][] = main-menu_information-library:information-library
+project path = sites/all/modules/custom

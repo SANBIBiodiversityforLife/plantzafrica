@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Content type: Vegetation feature.
+ */
+
+include_once 'content_type_vegetation.features.inc';

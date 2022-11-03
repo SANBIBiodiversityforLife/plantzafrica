@@ -1,0 +1,19 @@
+<?php
+/**
+ * @file admin_css.module
+ * We use this module to override our admin theme CSS without hacking the original theme shipped with Drupal.
+ */
+
+/**
+ * Implement hook_preprocess_html().
+ */
+function admin_css_preprocess_html(&$vars) {
+
+  global $theme;
+
+  //if admin theme
+  if($theme = 'seven'){
+    drupal_add_css(drupal_get_path('module', 'admin_css'). '/css/admin_tweaks.css');
+  }
+}
+

@@ -1,0 +1,8 @@
+name = Plantz Africa autocomplete
+description = Autocomplete routing for various search features around the Plantz Africa website
+dependencies[] = search_api
+dependencies[] = search_api_solr
+dependencies[] = search_api_views
+package = Greenbox
+core = 7.x
+files[] = tests/pa_autocomplete.test

@@ -1,0 +1,261 @@
+<?php
+
+/**
+ * Demonstration module.
+ *
+ * - Provide form for upload of a CSV file.
+ * - On submission, trigger a batch task which iterates through each row in the file.
+ */
+
+/**
+ * Implement hook_menu()
+ */
+
+function pa_crosscheck_menu() {
+  $items['admin/content/crosscheck'] = array(
+    'title' => 'Crosscheck',
+    'description' => 'Crosscheck htm filenames from a <abbr title="Comma Separated Values">CSV</abbr> or <abbr title="Tab Separated Values">TSV</abbr> file.',
+   // 'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('pa_crosscheck_form'),
+//  'file' => 'pa_crosscheck.admin.inc',
+  );
+  return $items ;
+}
+
+/**
+ * Build a form to upload CSV to.
+ */
+function pa_crosscheck_form() {
+  $form['#attributes'] = array(
+    'enctype' => 'multipart/form-data'
+  );
+
+  $form['csvfile'] = array(
+    '#title' => t('CSV File'),
+    '#type'  => 'file',
+    '#description' => ($max_size = parse_size(ini_get('upload_max_filesize'))) ? t('Due to server restrictions, the <strong>maximum upload file size is !max_size</strong>. Files that exceed this size will be disregarded.', array('!max_size' => format_size($max_size))) : '',
+  ) ;
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Commence crosscheck'),
+  ) ;
+  $form['#validate'] = array(
+    'pa_crosscheck_validate_fileupload',
+    'pa_crosscheck_form_validate',
+  ) ;
+  return $form ;
+}
+
+/**
+ * Validate the file upload. It must be a CSV, and we must
+ * successfully save it to our import directory.
+ */
+function pa_crosscheck_validate_fileupload(&$form, &$form_state) {
+  $validators = array(
+    'file_validate_extensions' => array( 'csv CSV' ),
+  ) ;
+  if ( $file = file_save_upload('csvfile', $validators, 'temporary://') ) {
+    // The file was saved using file_save_upload() and was added to
+    // the files table as a temporary file. We'll make a copy and let
+    // the garbage collector delete the original upload.
+    $csv_dir = 'temporary://csvfile';
+    $directory_exists = file_prepare_directory($csv_dir, FILE_CREATE_DIRECTORY);
+    if ($directory_exists) {
+      $destination = $csv_dir .'/' . $file->filename;
+      if (file_copy($file, $destination, FILE_EXISTS_REPLACE)) {
+        $form_state['values']['csvupload'] = $destination;
+      }
+      else {
+        form_set_error('pa_crosscheck', t('Unable to copy upload file to !dest', array('!dest' => $destination)));
+      }
+    }
+  }
+}
+
+/**
+ * Validate the upload. Ensure that the CSV looks something like we
+ * expect it to.
+ */
+function pa_crosscheck_form_validate(&$form, &$form_state) {
+  if ( isset( $form_state['values']['csvupload'] ) ) {
+    if ( $handle = fopen($form_state['values']['csvupload'], 'r') ) {
+      $line_count = 1 ;
+      $first = TRUE ;
+      if ( $line = fgetcsv($handle, 0, ";") ) {
+        /**
+         * Validate the uploaded CSV here.
+         *
+         * The example CSV happens to have cell A1 ($line[0]) as
+         * below; we validate it only.
+         *
+         * You'll probably want to check several headers, eg:
+         *   if ( $line[0] == 'Index' || $line[1] != 'Supplier' || $line[2] != 'Title' )
+         */
+        // if ( $line[0] != 'Example CSV for pa_crosscheck.module - http://github.com/xurizaemon/pa_crosscheck' ) {
+        //   form_set_error('csvfile', t('Sorry, this file does not match the expected format.')) ;
+        // }
+      }
+      fclose($handle);
+    }
+    else {
+      form_set_error('csvfile', t('Unable to read uploaded file !filepath', array('!filepath' => $form_state['values']['csvupload'])));
+    }
+  }
+}
+
+/**
+ * Handle form submission. Read the CSV into a set of batch operations
+ * and fire them off.
+ */
+function pa_crosscheck_form_submit(&$form, &$form_state) {
+  $batch = array(
+    'title' => t('Performing crosscheck ...'),
+    'operations' => array(),
+    'init_message' => t('Commencing'),
+    'progress_message' => t('Processed @current out of @total.'),
+    'error_message' => t('An error occurred during processing'),
+    'finished' => 'pa_crosscheck_import_finished',
+  );
+
+  if (isset($form_state['values']['csvupload'])) {
+    if ($handle = fopen($form_state['values']['csvupload'], 'r')) {
+
+      // Firstly, make sure the plants directory exists
+      $dir = "public://images/plants";
+      file_prepare_directory($dir, FILE_CREATE_DIRECTORY);
+
+      $batch['operations'][] = array('_pa_crosscheck_remember_filename', array( $form_state['values']['csvupload'] ) ) ;
+      $line_count = 1 ;
+      $first = TRUE ;
+      $line = fgetcsv($handle, 0, ";");
+      while ( $line = fgetcsv($handle, 0, ";") ) {
+        /**
+         * we use base64_encode to ensure we don't overload the batch
+         * processor by stuffing complex objects into it
+         */
+
+          $batch['operations'][] = array('pa_crosscheck_process_line', array(array_map('base64_encode', $line)));
+
+
+
+      }
+      fclose($handle);
+    } // we caught this in pa_crosscheck_form_validate()
+  } // we caught this in pa_crosscheck_form_validate()
+
+  batch_set($batch);
+}
+
+/**
+ * Handle batch completion.
+ */
+function pa_crosscheck_import_finished($success, $results, $operations) {
+  if ( !empty($results['failed_rows']) ) {
+    $dir = 'public://pa_crosscheck' ;
+    if (file_prepare_directory( $dir, FILE_CREATE_DIRECTORY ) ) {
+      $csv_filename = 'failed_rows-'. basename($results['uploaded_filename']); // we validated extension on upload
+      $csv_filepath = $dir .'/'. $csv_filename;
+      $targs = array(
+        '!csv_url' => l(check_plain($csv_filename), file_create_url($csv_filepath)),
+        '%csv_filename' => $csv_filename,
+        '%csv_filepath' => $csv_filepath,
+      ) ;
+      if ( $handle = fopen($csv_filepath, 'w+') ) {
+        foreach( $results['failed_rows'] as $failed_row ) {
+          fputcsv($handle, $failed_row);
+        }
+        fclose($handle);
+        drupal_set_message(t('Some rows failed. You may download a CSV of these rows: !csv_url', $targs), 'error');
+      }
+      else {
+        drupal_set_message(t('Some rows failed, but unable to write error CSV to %csv_filepath', $targs), 'error');
+      }
+    }
+    else {
+      drupal_set_message(t('Some rows failed, but unable to create directory for error CSV at %csv_directory', $targs), 'error');
+    }
+  }
+
+  // Success
+  if (!empty($results['success'])){
+    drupal_set_message(t('<b>The following htm files were successfully matched with a plant title:</b><br/><br/>' . $results['success']));
+  }
+
+  // Not found
+  if (!empty($results['not_found'])){
+    drupal_set_message(t('<b>The following htm files were not matched with a plant title:</b><br/><br/>' . $results['not_found']), 'error');
+  }
+
+  // Complete
+  return t('The crosscheck has completed.');
+
+}
+
+/**
+ * Remember the uploaded CSV filename
+ *
+ * @TODO is there a better way to pass a value from inception of the
+ * batch to the finished function?
+ */
+function _pa_crosscheck_remember_filename($filename, &$context) {
+  $context['results']['uploaded_filename'] = $filename;
+}
+
+
+/**
+ * Process a line from the plants CSV file.
+ */
+function pa_crosscheck_process_line($line, &$context){
+
+  $context['results']['rows_processed']++;
+  $line = array_map('base64_decode', $line);
+
+  $title = $line[1];
+
+  // Check whether a node with that title already exists
+  $query = new EntityFieldQuery();
+  $entities = $query->entityCondition('entity_type', 'node')
+  ->propertyCondition('type', 'plant')
+  ->propertyCondition('title', $title)
+  // ->propertyCondition('status', 1)
+  ->range(0,1)
+  ->execute();
+
+  if (!empty($entities['node'])) {
+
+    $node_ids = array_keys($entities['node']);
+
+    $nid = $node_ids[0];
+
+
+    // Add path alias
+    $alias = 'plants/' . substr($line[0], 0, -4);
+
+    // Node save method
+    //$node = node_load($nid); // ...where $nid is the node id
+    //$node->path['alias'] = $alias;
+    //node_save($node);
+
+    if (drupal_lookup_path('source', $alias)){
+      // Path already exists
+      $alias.= ";already exists";
+
+    }else{
+
+      // Path save method
+      $path['source'] = 'node/' . $nid;
+      $path['alias'] = $alias;
+      path_save($path);
+    }
+
+    // Node exists with that title
+    $context['results']['success'].= $line[0] . ';' . $line[1] . ';' . $nid . ';' . $alias . '<br/>';
+
+  }else{
+
+    // Not found
+    $context['results']['not_found'].= $line[0] . ';' . $line[1] . '<br/>';
+  }
+}

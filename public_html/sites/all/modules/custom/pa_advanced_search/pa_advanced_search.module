@@ -1,0 +1,553 @@
+<?php
+
+/**
+ * @file pa_advanced_search.module
+ * Provides functionality for Plants Africa advanced search
+ */
+
+//module includes
+module_load_include('inc', 'pa_advanced_search', '/includes/pa_advanced_search.theme');
+module_load_include('inc', 'pa_advanced_search', '/includes/pa_advanced_search.callbacks');
+module_load_include('inc', 'pa_advanced_search', '/includes/pa_advanced_search.forms');
+module_load_include('inc', 'pa_advanced_search', '/includes/pa_advanced_search.blocks');
+
+/**
+ * Implements hook_menu().
+ */
+function pa_advanced_search_menu() {
+  $items = array();
+
+  //default landing page with no advanced search
+  $items['plants/search/list'] = array(
+    'title' => 'Plants of the Week',
+    'page callback' => 'pa_advanced_search_page',
+    'page arguments' => array('basic'),
+    'file' => 'includes/pa_advanced_search.pages.inc',
+    'access arguments' => array('access content'),
+    'type' => MENU_NORMAL_ITEM
+  );
+
+  //advanced search page which includes the form
+  $items['plants/search/advanced'] = array(
+    'title' => 'Plants of the Week Advanced Search',
+    'page callback' => 'pa_advanced_search_page',
+    'page arguments' => array('advanced'),
+    'file' => 'includes/pa_advanced_search.pages.inc',
+    'access arguments' => array('access content'),
+    'type' => MENU_NORMAL_ITEM
+  );
+
+  return $items;
+}
+
+/**
+ * Performs search query using Search API after receiving values
+ */
+function pa_advanced_search_execute($args){
+
+  // RR:
+  // there was a problem with a fulltext search combined with any facet search would return nothing,
+  // even if each run independently would return an overlapping subset of plants.
+  // the fix below is a hack until the query_searc_api for MySQL is fixed to handle this:
+  // it simply runs a combined search as two separate searches, unions the results, and performs the range offset
+  // manually.  Given that the number of PoW's is +/- 2000 this performs adequately.
+  // RR end
+  
+  $index = search_api_index_load('plants');
+  $query = new SearchApiQuery($index);
+  $query_fulltext = new SearchApiQuery($index); // RR added for fulltext as separate query
+
+  //set our query options
+  $query->setOption('search id', 'pa:search:plants:advanced');
+  $query->setOption('skip result count', FALSE);
+  
+  // RR added for fulltext as separate query
+  $query_fulltext->setOption('search id', 'pa:search:plants:advanced');
+  $query_fulltext->setOption('skip result count', FALSE);
+
+  //RR
+  //when fulltext and facet criteria are applied, the search api database returns 
+  //the correct result count, but no results.
+  //removing the sort criteria doesn't fix
+  //upgrade of search api doesn't fix
+  
+  
+  $qry_fulltext = pa_advanced_search_has_filter_fulltext($args);
+  $qry_rest = pa_advanced_search_has_filter_rest($args);
+  
+  //apply any required filters
+  $query = pa_advanced_search_apply_filters($query, $args, false, true); // RR get everything but fulltext criteria
+  // RR added
+  if ($qry_fulltext) {
+    $query_fulltext = pa_advanced_search_apply_filters($query_fulltext, $args, true, false);    
+  } // RR added end
+  
+  //apply any required sorting criteria
+  $query = pa_advanced_search_apply_sorts($query, $args);
+  // RR added
+  if ($qry_fulltext) {
+    $query_fulltext = pa_advanced_search_apply_sorts($query_fulltext, $args);
+  } // RR added end
+  
+  //apply any range requirements for paging
+  $offset = (!isset($_GET['page']))? 0 : $_GET['page'] * 20;
+  // RR if both types of query present then will do this part manually later on once arrays have had union calculated
+  if ($qry_fulltext xor $qry_rest) {
+    if ($qry_rest) {
+      $query->range($offset, $limit = 20);
+    } else {
+      $query_fulltext->range($offset, $limit = 20);
+    }
+  }
+  if (!($qry_fulltext || $qry_rest)) $query->range($offset, $limit = 20); // RR no criteria at all
+
+  $has_key = FALSE;
+  //set keys explicitly to enable excerpt highlighting etc
+  if(isset($args['name']) && $args['name'] != ''){
+    $query_fulltext->keys($args['name']);
+    $has_key = TRUE;
+  } 
+  
+  //execute our query
+  $data = $query->execute();
+  // RR added
+ if ($qry_fulltext) {
+    $data_fulltext = $query_fulltext->execute();
+    if (!isset($data_fulltext['results'])) $data_fulltext['results'] = array(); // to avoid having to keep checking if array exists
+  }
+  
+  //if both type of query, filter fulltext version with results of rest; 
+  //otherwise rest results will be shown
+  if ($qry_rest && $qry_fulltext) {
+    if (isset($data['results'])) {
+      foreach ($data_fulltext['results'] as $key => $value){
+        if (!isset($data['results'][$key])) {
+          unset($data_fulltext['results'][$key]);
+        }
+      }
+      //now we have a potentially large number of results without the correct offset: do this now
+      $data_ranged = array();
+      $data_fulltext['result count'] = count($data_fulltext['results']);
+      $result_no = 0;
+      foreach ($data_fulltext['results'] as $res) {
+        if ($result_no >= $offset && $result_no < $offset+20) {
+          $data_ranged[] = $res;
+        } 
+        $result_no++;
+      }
+      $data_fulltext['results'] = $data_ranged;
+      $data = $data_fulltext;
+    } else {
+      //do nothing - data results cannot be increased even if there were results for the fulltext search
+    }
+  }
+  if ($qry_rest && !$qry_fulltext) { } //do nothing
+  if (!$qry_rest && $qry_fulltext) { //put fulltext search into results
+    $data = $data_fulltext;
+  }
+  
+  //echo "<pre>";
+  //print_r($query->getFilter());
+  //print_r($data);
+  //echo "</pre>";
+  //exit;
+  
+  $results['plants'] = array();
+  $results['count'] = 0;
+
+  if(isset($data['results'])){
+
+    //if no search key specified then we need to load entities from cache
+    if(!$has_key){
+
+      $ids = $data['results'];
+      $ids = array_keys($ids);
+      //load Plants entities from DB using search results nids
+      $plants = entity_load('node', $ids);
+      $results['plants'] = $plants;
+
+    }else{      
+            
+      foreach($data['results'] as $delta => $plant){
+        $tmp = new stdClass();
+        // RR some plants don't have an excerpt; e.g. for a family search.  So remove this condition.
+        //if(isset($plant['excerpt'])){
+          $tmp = $plant['entity'];          
+          $tmp->excerpt = isset($plant['excerpt'])? $plant['excerpt'] : "";          
+          $results['plants'][$delta] = $tmp;
+        //}
+      }
+    }
+
+    $results['count'] = $data['result count'];
+  }
+
+  //krumo($results);
+  return $results;
+}
+
+/**
+ * RR checks if advanced query includes a fulltext search
+ */
+function pa_advanced_search_has_filter_fulltext($args) {
+  if(isset($args['name']) && $args['name'] != '') return true;
+  return false;
+}
+
+/**
+ * RR checks if advanced query includes non-fulltext search criteria (including glossary criteria)
+ */
+function pa_advanced_search_has_filter_rest($args) {
+  unset($args['date_sort'], $args['name'], $args['page']);
+
+  //check to see if we have any arguments from search form
+  if(!empty($args)) return true;
+  return false;
+}
+
+/**
+ * Applies FILTERS to our query according to the arguments received from our search form.
+ * RR added qry_fulltext and qry_rest parameters and defaults
+ */
+function pa_advanced_search_apply_filters($query, $args, $qry_fulltext = true, $qry_rest = true){
+
+  //Firstly check if we're filtering glossary style by letter (A B C D etc etc)
+  if(isset($args['glossary'])){
+    $filter = $query->createFilter('AND');
+    $filter->condition('search_api_title_first_letter', $args['glossary'], '=');
+    $query->filter($filter);
+  }
+
+  //remove our sort parameters before filter check
+  unset($args['date_sort'], $args['glossary'], $args['page']);
+
+  //check to see if we have any arguments from search form
+  if(!empty($args)){
+    $query = pa_advanced_search_build_nested_filters($query, $args, $qry_fulltext, $qry_rest); // RR added qry_* params
+  }
+
+  //Node type is "Plant" and published sanity check
+  /*$filter = $query->createFilter('AND');
+  $filter->condition('type', 'plant');
+  $filter->condition('status', 1);
+  $query->filter($filter);*/
+
+  return $query;
+}
+
+/**
+ * Generates nested filters for search query based on received URL params.
+ */
+function pa_advanced_search_build_nested_filters($query, $args, $qry_fulltext = true, $qry_rest = true){
+
+  //flag to see if we need to add a filter between sub queries
+  $default = TRUE;
+  // RR
+  //print_r($args); exit;
+  
+  if ($qry_fulltext) {
+    //Different name(s) and description(s) fields
+    if(isset($args['name']) && $args['name'] != ''){
+
+      $default = FALSE;
+
+      $sub_filter = $query->createFilter('OR');
+
+      //first check to see if we're targetting only genus or familly vow POW node link
+      if(isset($args['pow_page'])){
+
+        $sub_filter->condition('field_' . $args['pow_page'] . ':name', $args['name'], '=');
+
+      //otherwise include all the other free text fields too
+      }else{
+
+        //Names
+        $sub_filter->condition('title', $args['name'], '=');
+        $sub_filter->condition('field_common_names', $args['name'], '=');
+        $sub_filter->condition('field_short_scientific_name', $args['name'], '=');
+        $sub_filter->condition('field_long_scientific_name:value', $args['name'], '=');
+        //Rich text fields
+        $sub_filter->condition('field_introduction:value', $args['name'], '=');
+        $sub_filter->condition('field_description:value', $args['name'], '=');
+        $sub_filter->condition('field_distribution_description:value', $args['name'], '=');
+        $sub_filter->condition('field_history:value', $args['name'], '=');
+        $sub_filter->condition('field_ecology:value', $args['name'], '=');
+        $sub_filter->condition('field_use:value', $args['name'], '=');
+        $sub_filter->condition('field_grow:value', $args['name'], '=');
+        $sub_filter->condition('field_status:value', $args['name'], '=');
+        //Taxonomies and misc.
+        $sub_filter->condition('field_family:name', $args['name'], '=');
+        $sub_filter->condition('field_genus:name', $args['name'], '=');
+        $sub_filter->condition('field_sa_tree_number', $args['name'], '=');
+        //Author user entity firstname and surname fields
+        $sub_filter->condition('field_authors:field_first_name', $args['name'], '=');
+        $sub_filter->condition('field_authors:field_last_name', $args['name'], '=');
+      }
+
+      $query->filter($sub_filter);
+
+    //if no free text then do attribute search instead
+    //}else{
+    } // RR
+  }
+  
+  if ($qry_rest) {
+    //Date range widget
+    if(isset($args['date_start']) && isset($args['date_start'])){
+
+      $default = FALSE;
+
+      $sub_filter = $query->createFilter('AND');
+      $sub_filter->condition('field_week', $args['date_start'], '>=');
+      $sub_filter->condition('field_week', $args['date_end'], '<=');
+      $query->filter($sub_filter);
+    }
+
+    //remove all params which are no facets from our query array
+    unset($args['name']);
+    unset($args['date_start']);
+    unset($args['date_end']);
+    unset($args['date_sort']);
+    unset($args['title_sort']);
+    unset($args['pow_page']);
+
+    //loop through remaining params and apply build facet sub queries
+    if(!empty($args)){
+      foreach($args as $key => $f){
+
+        //add an "AND" clause if not the first sub query in our main query (lol not confusing at all)
+        if(!$default){
+          $filter = $query->createFilter('AND');
+        }
+
+        //build our sub query filter
+        $sub_filter = $query->createFilter('OR');
+        foreach($args[$key] as $term_name){
+          $facet_key = 'field_' . $key . ':name';
+          $sub_filter->condition($facet_key, $term_name, '=');
+        }
+
+        //apply sub filter to main query
+        $query->filter($sub_filter);
+
+        //apply main filter if not default state
+        if(!$default){
+          $query->filter($filter);
+        }
+
+        $default = FALSE;
+      }
+    }
+  //} // RR
+  }
+  
+  // RR : need to combine both search types (fulltext and faceted) into single query
+  //SearchApiQuery object
+  //print_r($query); exit;
+  return $query;
+}
+
+/**
+ * Applies SORTS to our query according to the arguments received from our search form.
+ */
+function pa_advanced_search_apply_sorts($query, $args){
+
+  $default = TRUE;
+
+  //check if we're sorting by title without glossary
+  if(isset($args['title_sort']) && !isset($args['glossary'])){
+
+    //apply our tite sort to query object
+    $default = FALSE;
+    $query->sort('title', $args['title_sort']);
+
+  //check if we're sorting by glossary AND title
+  }elseif(isset($args['title_sort']) && isset($args['glossary'])){
+
+    $default = FALSE;
+    $query->sort('search_api_title_first_letter', 'ASC');
+    $query->sort('title', $args['title_sort']);
+
+  //check if only sorting by glossary
+  }elseif(!isset($args['title_sort']) && isset($args['glossary'])){
+    $default = FALSE;
+    $query->sort('search_api_title_first_letter', 'ASC');
+  }
+
+  //if we have no other search criteria use date
+  if($default){
+    $date_direction = isset($args['date_sort'])? $args['date_sort'] : 'DESC';
+    $query->sort('field_week', $date_direction);
+  }
+
+  return $query;
+}
+
+function pa_advanced_search_tab_urls($params){
+
+  $tmp = $params;
+
+  //set tab action URLs
+  if(arg(2) == 'list'){
+
+    $tmp['title_sort'] = 'ASC';
+    $tmp['glossary'] = 'A';
+
+    $tab_url['date'] = url('plants/search/list');
+    $tab_url['title'] = url('plants/search/list', array('query' => $tmp));
+
+  }else{
+
+    unset($tmp['title_sort']);
+    unset($tmp['glossary']);
+    $tmp['date_sort'] = 'DESC';
+    $tab_url['date'] = url('plants/search/advanced', array('query' => $tmp, 'absolute' => TRUE));
+
+    $tmp = $params;
+    unset($tmp['date_sort']);
+    $tmp['title_sort'] = 'ASC';
+    $tab_url['title'] = url('plants/search/advanced', array('query' => $tmp, 'absolute' => TRUE));
+  }
+
+  return $tab_url;
+}
+
+/**
+ * Builds glossary links for our letter search navigation.
+ */
+function pa_advanced_search_build_glossary_nav($params){
+
+  $links = array();
+
+  //form an array of a - z
+  $letters = range('A', 'Z');
+
+  //loop through letters and generate links
+  foreach($letters as $delta => $letter){
+
+    $tmp = $params;
+    $tmp['glossary'] = $letter;
+
+    $attributes['href'] = url(current_path(), array('query' => $tmp));
+    $attributes['class'] = (isset($_GET['glossary']) && $_GET['glossary'] == $letter)? array('active') : NULL;
+    $links[] = '<a' . drupal_attributes($attributes) . '>' . check_plain($letter) . '</a>';
+  }
+
+  //add pipe delimiter
+  $links = implode(' | ', $links);
+
+  return $links;
+}
+
+/**
+ * Function which builds our date sorting links.
+ */
+function pa_advanced_search_sort_links($params, $type = 'date'){
+
+  switch($type){
+
+    //date links
+    case 'date':
+
+      unset($params['title_sort']);
+      unset($params['glossary']);
+
+      $params[$type . '_sort'] = 'ASC';
+      $attributes['class'] = (isset($_GET[$type . '_sort']) && $_GET[$type . '_sort'] == 'ASC')? array('active') : NULL;
+      $attributes['href'] = url(current_path(), array('query' => $params));
+      $sort['asc'] = '<a' . drupal_attributes($attributes) . '>Ascending</a>';
+
+      $params[$type . '_sort'] = 'DESC';
+
+      $attributes = array();
+
+      //check if we have param set or if default POWAS listing page
+      if(isset($_GET[$type . '_sort']) && $_GET[$type . '_sort'] == 'DESC'){
+        $attributes['class'] = array('active');
+      }elseif(!isset($_GET[$type . '_sort'])){
+        $attributes['class'] = array('active');
+      }
+      $attributes['href'] = url(current_path(), array('query' => $params));
+      $sort['desc'] = '<a' . drupal_attributes($attributes) . '>Descending</a>';
+
+      break;
+
+    //title links
+    case 'title':
+
+      unset($params['date_sort']);
+
+      $params[$type . '_sort'] = 'ASC';
+      $attributes['class'] = (isset($_GET[$type . '_sort']) && $_GET[$type . '_sort'] == 'ASC')? array('active') : NULL;
+      $attributes['href'] = url(current_path(), array('query' => $params));
+      $sort['asc'] = '<a' . drupal_attributes($attributes) . '>Ascending</a>';
+
+      $params[$type . '_sort'] = 'DESC';
+      $attributes['class'] = (isset($_GET[$type . '_sort']) && $_GET[$type . '_sort'] == 'DESC')? array('active') : NULL;
+      $attributes['href'] = url(current_path(), array('query' => $params));
+      $sort['desc'] = '<a' . drupal_attributes($attributes) . '>Descending</a>';
+
+      break;
+  }
+
+  return $sort;
+}
+
+/**
+ * Generates links for currently active search filters.
+ */
+function pa_advanced_search_get_active_filters(){
+
+  $content = '';
+
+  //declare which URL parameters we need to ignore
+  $remove = array(
+    'date_sort' => '',
+    'title_sort' => '',
+    'glossary' => '',
+    'page' => '',
+  );
+
+  //get our parameters from GET variable
+  $params = drupal_get_query_parameters();
+
+  //remove meta sort / paging params
+  $active = array_diff_key($params, $remove);
+
+  //loop through active filters and generate links
+  $widgets = '';
+  $empty = TRUE;
+  foreach($active as $key => $options){
+
+    //ignore name input and family / genus flag params
+    if($key != 'name' && $key != 'pow_page'){
+      foreach($options as $delta => $filter){
+
+        //remove the active facets param from the URL
+        $widget_params = $active;
+        unset($widget_params[$key][$delta]);
+        $empty = FALSE;
+
+        //build widget links and assign to array and clean up filter values
+        $filter = str_replace('plant', '', $filter);
+        //$filter = substr($filter, 0, 8);
+
+        $url = url('plants/search/advanced', array('query' => $widget_params, 'absolute' => TRUE));
+        $widgets .= '<a href="' . $url . '" class="search-criterea-btn">' . $filter . '</a>';
+      }
+    }
+  }
+
+  if(!$empty){
+    $content = $widgets;
+
+    return array(
+      '#markup' => $content,
+      '#prefix' => '<div class="search-criterea">
+                    <h4>Current search criteria</h4>
+                    <div class="attr-cols">',
+      '#suffix' => '  </div>
+                  </div>',
+    );
+  }
+}

@@ -1,0 +1,18 @@
+<?php
+/**
+ * @file
+ * Code for the Plant Settings feature.
+ */
+
+include_once 'plant_settings.features.inc';
+
+// RR added for plant checkers
+function plant_settings_node_access($node, $op, $account) {
+  // Deny updating the content if it's a published plant
+  if (user_has_role(8)) { // plant checker
+    if ($node->type == 'plant' && $node->status && $op != 'view') {
+      //drupal_set_message('This plant has been published, you may not make changes to it.','error');
+      return NODE_ACCESS_DENY;
+    }
+  }
+}

@@ -1,0 +1,15 @@
+name = About Page
+description = About Page
+core = 7.x
+package = Features
+dependencies[] = content_type_vegetation
+dependencies[] = fe_block
+dependencies[] = features
+dependencies[] = filefield_paths
+dependencies[] = node_export_features
+dependencies[] = node_export_features
+features[fe_block_boxes][] = about_sanbi_sidebar
+features[fe_block_settings][] = block-about_sanbi_sidebar
+features[features_api][] = api:2
+features[node_export_features][] = 460e6215-ffd8-4722-b0ed-07ea050715df
+project path = sites/all/modules/custom

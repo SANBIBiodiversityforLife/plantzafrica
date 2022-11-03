@@ -1,0 +1,5 @@
+name = Plantz Africa Family updater
+description = A custom module updating plant family names
+package = Greenbox
+core = 7.x
+files[] = tests/pa_update_families.test

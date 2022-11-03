@@ -1,0 +1,3 @@
+.node-form input.form-text{
+  width:550px;
+}

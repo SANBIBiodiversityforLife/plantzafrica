@@ -1,0 +1,14 @@
+name = Lexicon glossary
+description = Provides lexicon term highlighting functionality for Plant content
+core = 7.x
+package = Lexicon
+dependencies[] = ckeditor_link
+dependencies[] = features
+dependencies[] = filter
+dependencies[] = lexicon
+dependencies[] = taxonomy
+features[features_api][] = api:2
+features[filter][] = filtered_html
+features[filter][] = full_html
+features[taxonomy][] = lexicon
+project path = sites/all/modules/custom

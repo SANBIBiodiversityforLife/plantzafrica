@@ -1,0 +1,720 @@
+<?php
+
+/**
+ * Demonstration module.
+ *
+ * - Provide form for upload of a CSV file.
+ * - On submission, trigger a batch task which iterates through each row in the file.
+ */
+
+/**
+ * Implement hook_menu()
+ */
+
+global $test_run;
+$test_run = false;
+
+function csvimport_menu() {
+  $items['admin/content/csv_import'] = array(
+    'title' => 'Import CSV',
+    'description' => 'Import content from a <abbr title="Comma Separated Values">CSV</abbr> or <abbr title="Tab Separated Values">TSV</abbr> file.',
+   // 'access callback' => 'user_access',
+    'access arguments' => array('administer site configuration'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('csvimport_form'),
+//  'file' => 'csvimport.admin.inc',
+  );
+  return $items ;
+}
+
+/**
+ * Build a form to upload CSV to.
+ */
+function csvimport_form() {
+  $form['#attributes'] = array(
+    'enctype' => 'multipart/form-data'
+  );
+
+  $form['import_type'] = array(
+    '#type' => 'radios',
+    '#title' => t('Import Type'),
+    '#required' => TRUE,
+    /*'#description' => t('Specify ur site.'),*/
+    '#options' => array(t('Authors'), t('Plants')),
+  );
+
+  $form['csvfile'] = array(
+    '#title' => t('CSV File'),
+    '#type'  => 'file',
+    '#description' => ($max_size = parse_size(ini_get('upload_max_filesize'))) ? t('Due to server restrictions, the <strong>maximum upload file size is !max_size</strong>. Files that exceed this size will be disregarded.', array('!max_size' => format_size($max_size))) : '',
+  ) ;
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Commence Import'),
+  ) ;
+  $form['#validate'] = array(
+    'csvimport_validate_fileupload',
+    'csvimport_form_validate',
+  ) ;
+  return $form ;
+}
+
+/**
+ * Validate the file upload. It must be a CSV, and we must
+ * successfully save it to our import directory.
+ */
+function csvimport_validate_fileupload(&$form, &$form_state) {
+  $validators = array(
+    'file_validate_extensions' => array( 'csv CSV' ),
+  ) ;
+  if ( $file = file_save_upload('csvfile', $validators, 'temporary://') ) {
+    // The file was saved using file_save_upload() and was added to
+    // the files table as a temporary file. We'll make a copy and let
+    // the garbage collector delete the original upload.
+    $csv_dir = 'temporary://csvfile';
+    $directory_exists = file_prepare_directory($csv_dir, FILE_CREATE_DIRECTORY);
+    if ($directory_exists) {
+      $destination = $csv_dir .'/' . $file->filename;
+      if (file_copy($file, $destination, FILE_EXISTS_REPLACE)) {
+        $form_state['values']['csvupload'] = $destination;
+      }
+      else {
+        form_set_error('csvimport', t('Unable to copy upload file to !dest', array('!dest' => $destination)));
+      }
+    }
+  }
+}
+
+/**
+ * Validate the upload. Ensure that the CSV looks something like we
+ * expect it to.
+ */
+function csvimport_form_validate(&$form, &$form_state) {
+  if ( isset( $form_state['values']['csvupload'] ) ) {
+    if ( $handle = fopen($form_state['values']['csvupload'], 'r') ) {
+      $line_count = 1 ;
+      $first = TRUE ;
+      if ( $line = fgetcsv($handle, 0, ";") ) {
+        /**
+         * Validate the uploaded CSV here.
+         *
+         * The example CSV happens to have cell A1 ($line[0]) as
+         * below; we validate it only.
+         *
+         * You'll probably want to check several headers, eg:
+         *   if ( $line[0] == 'Index' || $line[1] != 'Supplier' || $line[2] != 'Title' )
+         */
+        // if ( $line[0] != 'Example CSV for csvimport.module - http://github.com/xurizaemon/csvimport' ) {
+        //   form_set_error('csvfile', t('Sorry, this file does not match the expected format.')) ;
+        // }
+      }
+      fclose($handle);
+    }
+    else {
+      form_set_error('csvfile', t('Unable to read uploaded file !filepath', array('!filepath' => $form_state['values']['csvupload'])));
+    }
+  }
+}
+
+/**
+ * Handle form submission. Read the CSV into a set of batch operations
+ * and fire them off.
+ */
+function csvimport_form_submit(&$form, &$form_state) {
+  $batch = array(
+    'title' => t('Importing CSV ...'),
+    'operations' => array(),
+    'init_message' => t('Commencing'),
+    'progress_message' => t('Processed @current out of @total.'),
+    'error_message' => t('An error occurred during processing'),
+    'finished' => 'csvimport_import_finished',
+  );
+
+  global $test_run;
+
+  if (isset($form_state['values']['csvupload'])) {
+    if ($handle = fopen($form_state['values']['csvupload'], 'r')) {
+
+      // Firstly, make sure the plants directory exists
+      $dir = "public://images/plants";
+      file_prepare_directory($dir, FILE_CREATE_DIRECTORY);
+
+      $batch['operations'][] = array('_csvimport_remember_filename', array( $form_state['values']['csvupload'] ) ) ;
+      $line_count = 1 ;
+      $first = TRUE ;
+      $line = fgetcsv($handle, 0, ";");
+      while ( $line = fgetcsv($handle, 0, ";") ) {
+        /**
+         * we use base64_encode to ensure we don't overload the batch
+         * processor by stuffing complex objects into it
+         */
+
+        if ($form['import_type']['#value'] == 1){
+
+          // Process plant row
+          //csvimport_process_line_plant(array_map('base64_encode', $line));
+
+          $batch['operations'][] = array('csvimport_process_line_plant', array(array_map('base64_encode', $line)));
+
+          //break;
+
+        }elseif ($form['import_type']['#value'] == 0){
+
+          // Process line row
+          //csvimport_process_line_user($line);
+
+          $batch['operations'][] = array('csvimport_process_line_user', array($line));
+
+
+        }
+
+
+      }
+      fclose($handle);
+    } // we caught this in csvimport_form_validate()
+  } // we caught this in csvimport_form_validate()
+
+  batch_set($batch);
+}
+
+/**
+ * Handle batch completion.
+ */
+function csvimport_import_finished($success, $results, $operations) {
+  if ( !empty($results['failed_rows']) ) {
+    $dir = 'public://csvimport' ;
+    if (file_prepare_directory( $dir, FILE_CREATE_DIRECTORY ) ) {
+      $csv_filename = 'failed_rows-'. basename($results['uploaded_filename']); // we validated extension on upload
+      $csv_filepath = $dir .'/'. $csv_filename;
+      $targs = array(
+        '!csv_url' => l(check_plain($csv_filename), file_create_url($csv_filepath)),
+        '%csv_filename' => $csv_filename,
+        '%csv_filepath' => $csv_filepath,
+      ) ;
+      if ( $handle = fopen($csv_filepath, 'w+') ) {
+        foreach( $results['failed_rows'] as $failed_row ) {
+          fputcsv($handle, $failed_row);
+        }
+        fclose($handle);
+        drupal_set_message(t('Some rows failed to import. You may download a CSV of these rows: !csv_url', $targs), 'error');
+      }
+      else {
+        drupal_set_message(t('Some rows failed to import, but unable to write error CSV to %csv_filepath', $targs), 'error');
+      }
+    }
+    else {
+      drupal_set_message(t('Some rows failed to import, but unable to create directory for error CSV at %csv_directory', $targs), 'error');
+    }
+  }
+
+  // Invalid column count
+  if (!empty($results['invalid_column_count']))
+  {
+    drupal_set_message(t('Some rows had invalid column counts: <br/>' . $results['invalid_column_count']), 'error');
+  }
+
+  // Missing images
+  if (!empty($results['missing_images']))
+  {
+    drupal_set_message(t('Missing Images: <br/>' . $results['missing_images']), 'error');
+  }
+
+  // Missing images
+  if (!empty($results['filepaths']))
+  {
+    drupal_set_message(t('Filepaths: <br/>' . $results['filepaths']), 'error');
+  }
+
+  // Success
+  if (!empty($results['success']))
+  {
+    drupal_set_message(t('Success: <br/>' . $results['success']));
+  }
+
+  // Invalid usernames
+  if (!empty($results['invalid_username'])){
+    drupal_set_message(t('Skipped: <br/>' . $results['invalid_username']));
+  }
+
+  // Invalid date
+  if (!empty($results['invalid_date'])){
+    drupal_set_message(t('Plants with invalid dates (but not skipped): <br/>' . $results['invalid_date']), 'error');
+  }
+
+  // Plant already exists
+  if (!empty($results['plant_exists'])){
+    drupal_set_message(t('Plants already exist (skipped): <br/>' . $results['plant_exists']), 'error');
+  }
+
+  // User already exists
+  if (!empty($results['user_exists'])){
+    drupal_set_message(t('List of users that already exist and were skipped (' . $results['user_exists_count'] . ') : <br/>' . $results['user_exists']), 'error');
+  }
+
+
+  // Complete
+  return t('The CSV import has completed.');
+}
+
+/**
+ * Remember the uploaded CSV filename
+ *
+ * @TODO is there a better way to pass a value from inception of the
+ * batch to the finished function?
+ */
+function _csvimport_remember_filename($filename, &$context) {
+  $context['results']['uploaded_filename'] = $filename ;
+}
+
+
+/**
+ * Get taxonomy term ID. Supply function with taxonomy term name and vocabulary. If the term doesn't exist then
+ * it's added to the vocabulary.
+ */
+function csvimport_get_taxonomy_tid($taxonomy_term, $vocabulary) {
+
+  //Check if term name exists in "Family" vocabulary
+  if ($matches = taxonomy_get_term_by_name($taxonomy_term, $vocabulary['machine_name'])) {
+
+    //krumo($matches);
+
+    //Loop through matches
+    foreach ($matches as $key => $match) {
+
+      //Compare
+      if (strtolower($match->name) == strtolower($taxonomy_term))
+      {
+        //Match found, return taxonomy id
+        return $match->tid;
+      }
+    }
+  }
+
+  //If we get here then the taxonomy term name was not found, so ddd to the vocabulary
+  $term = new stdClass();
+  $term->vid = $vocabulary['id'];
+  $term->name = $taxonomy_term;
+  taxonomy_term_save($term);
+  //krumo($term);
+  return $term->tid;
+}
+
+/**
+ * Process a line from the plants CSV file.
+ */
+function csvimport_process_line_plant($line, &$context){
+
+  // Whether to delete existing nodes with the same title
+  $delete_existing = false;
+
+  global $test_run;
+
+  $context['results']['rows_processed']++;
+  $line = array_map('base64_decode', $line);
+
+  if (count($line) != 30){
+    $context['results']['invalid_column_count'].= $context['results']['rows_processed'] . " - ";
+    $context['results']['invalid_column_count'].= count($line) . " columns (" . $line[0] . ") </br>";
+    return;
+  }
+
+  // Check whether a node with that title already exists
+  $query = new EntityFieldQuery();
+  $entities = $query->entityCondition('entity_type', 'node')
+  ->propertyCondition('type', 'plant')
+  ->propertyCondition('title', $line[0])
+  // ->propertyCondition('status', 1)
+  ->range(0,1)
+  ->execute();
+
+  if (!empty($entities['node'])) {
+
+    if ($delete_existing) {
+      // Node already exists
+      $node_ids = array_keys($entities['node']);
+
+      $nid = $node_ids[0];
+
+      // Delete node
+      node_delete($nid);
+
+      // Delete folder
+      drupal_rmdir('public://images/plants/' . $nid);
+
+    }else{
+
+      // Plant exists
+      $context['results']['plant_exists'].= $line[0] . '.<br/>';
+
+      // Skip plant
+      return;
+
+    }
+  }
+
+  $node = new stdClass(); // We create a new node object
+  $node->type = "plant"; // Or any other content type you want
+
+  if (!$line[0]){
+     // Set message
+    $context['results']['invalid_title'].= $line[0] . '.<br/>';
+  }
+
+  //Title
+  $node->title = $line[0];
+
+  $node->language = LANGUAGE_NONE; // Or any language code if Locale module is enabled. More on this below *
+  $node->path = array('alias' => 'new_node'); // Setting a node path
+  node_object_prepare($node); // Set some default values.
+
+  if ($line[9]){
+
+    // Now get the authorid from the username
+    $authors = explode("|", $line[9]);
+    $authors_uid = array();
+
+    foreach ($authors as $key => $author_username) {
+      if ($user = user_load_by_name($author_username)){
+        $authors_uid[$key] = $user->uid;
+      }else{
+        $context['results']['invalid_username'].= $author_username . "(" . $line[0] . ').<br/>';
+      }
+    }
+    // Skip import for this plant if the author username count doesn't match the authors uid count
+    if (count($authors) != count($authors_uid)) return;
+
+    // Use the first one as the main username
+    $uid = $authors_uid[0];
+
+  }else{
+    $uid = 1;
+  }
+
+  $node->uid = $uid; // uid
+  $node->status = 0; //(1 or 0): published or not
+  $node->promote = 0; //(1 or 0): promoted to front page
+  $node->comment = 0; // 0 = comments disabled, 1 = read only, 2 = read/write
+
+  // Family
+  $family = ucfirst(strtolower($line[3]));
+
+  if ($family && !$test_run){
+    $tid_family = csvimport_get_taxonomy_tid($family, array('machine_name' => 'family','id' => '12'));
+    $node->field_family[$node->language][] = array('tid' => $tid_family);
+  }
+
+  // Genus
+  $genus = ucfirst(strtolower($line[23]));
+
+  if ($genus && !$test_run){
+    $tid_genus = csvimport_get_taxonomy_tid($genus, array('machine_name' => 'genus','id' => '18'));
+    $node->field_genus[$node->language][] = array('tid' => $tid_genus);
+  }
+
+  // Location
+  $location = ucwords(str_replace("-", " ", strtolower($line[10]))); //Format location
+
+  if ($location && !$test_run){
+    $tid_location = csvimport_get_taxonomy_tid($location, array('machine_name' => 'location','id' => '13'));
+    $node->field_cost_center[$node->language][] = array('tid' => $tid_location);
+  }
+
+  // Populate the authors (entity reference field)
+  if (count($authors_uid) > 0) {
+    foreach ($authors_uid as $key => $author_uid) {
+      if (!$author_uid) $author_uid = 1;
+      $node->field_authors[$node->language][$key]['target_id'] = $author_uid;
+      $node->field_authors[$node->language][$key]['target_type'] = "user";
+    }
+  }
+
+  // Common names
+  $node->field_common_names[$node->language][0]['value'] = $line[4];
+  $node->field_common_names[$node->language][0]['format'] = 'plain_text'; // Plain text
+
+  // Short scientific name
+  $node->field_short_scientific_name[$node->language][0]['value'] = $line[1];
+  $node->field_short_scientific_name[$node->language][0]['format'] = 'plain_text'; // Plain text
+
+  // Long scientific name
+  $node->field_long_scientific_name[$node->language][0]['value'] = $line[2];
+  $node->field_long_scientific_name[$node->language][0]['format'] = 'full_html'; // Full html
+
+  // Week
+  $valid_date = true;
+  $date = date_parse($line[7]);
+
+  if (!$date['year']) $valid_date = false;
+  if (!$date['month']) $valid_date = false;
+  if (!$date['day']) $valid_date = false;
+
+  if (!$valid_date) {
+
+    // Set message
+    $context['results']['invalid_date'].= $line[0] . '.<br/>';
+
+    //$context['message'] = "Invalid date for plant: " . $node->title;
+    //$context['finished'] = 1;
+
+  }else{
+
+    // Valid date
+    $node->field_week[$node->language][0]['value'] = $line[7];
+  }
+
+  // Add path alias
+  $alias = substr($line[18], 0, -4);
+  $node->path['alias'] = 'plants/' . $alias;
+
+  //print_r($node);
+  $node = node_submit($node); // Prepare node for a submit
+
+  $context['results']['success'].= $node->title . " - " . $context['results']['rows_processed'] . "<br/>";
+
+  if (!$test_run) {
+      node_save($node); // After this call we'll get a nid
+  }
+
+  if ($node->nid) {
+
+    // Add primary url to images array
+    if ($image = json_decode($line[24])) {
+      // Get image file
+      if ($file = csvimport_get_image($image, $node->nid)){
+        // Set field
+        $node->field_primary_image[LANGUAGE_NONE][0] = (array)$file;
+      }
+    }
+
+    // Add secondary url to images array
+    if ($line[25]) {
+      $secondary_images = json_decode($line[25]);
+      foreach ($secondary_images as $key => $image) {
+
+        // Get image file
+        if ($file = csvimport_get_image($image, $node->nid)){
+          $node->field_secondary_images[LANGUAGE_NONE][$key] = (array)$file;
+        }
+      }
+    }
+
+    // Introduction
+    $node->field_introduction[$node->language][0]['value'] = csvimport_insert_nid($node->nid, $line[28]);
+    $node->field_introduction[$node->language][0]['format'] = 'full_html'; // Full html
+
+    //Description
+    $node->field_description[$node->language][0]['value'] = csvimport_insert_nid($node->nid, $line[11]);
+    $node->field_description[$node->language][0]['format'] = 'full_html'; // Full html
+
+    //Distribution description
+    $node->field_distribution_description[$node->language][0]['value'] = csvimport_insert_nid($node->nid, $line[12]);
+    $node->field_distribution_description[$node->language][0]['format'] = 'full_html'; // Full html
+
+    //Grow
+    $node->field_grow[$node->language][0]['value'] = csvimport_insert_nid($node->nid, $line[13]);
+    $node->field_grow[$node->language][0]['format'] = 'full_html'; // Full html
+
+    //History
+    $node->field_history[$node->language][0]['value'] = csvimport_insert_nid($node->nid, $line[14]);
+    $node->field_history[$node->language][0]['format'] = 'full_html'; // Full html
+
+    //Use
+    $node->field_use[$node->language][0]['value'] = csvimport_insert_nid($node->nid, $line[15]);
+    $node->field_use[$node->language][0]['format'] = 'full_html'; // Full html
+
+    //Status
+    $node->field_status[$node->language][0]['value'] = csvimport_insert_nid($node->nid, $line[16]);
+    $node->field_status[$node->language][0]['format'] = 'full_html'; // Full html
+
+    //Ecology
+    $node->field_ecology[$node->language][0]['value'] = csvimport_insert_nid($node->nid, $line[17]);
+    $node->field_ecology[$node->language][0]['format'] = 'full_html'; // Full html
+
+    //References
+    $node->field_references[$node->language][0]['value'] = csvimport_insert_nid($node->nid, $line[21]);
+    $node->field_references[$node->language][0]['format'] = 'full_html'; // Full html
+
+    //Credits
+    $node->field_credits[$node->language][0]['value'] = $line[26];
+    $node->field_credits[$node->language][0]['format'] = 'full_html'; // Full html
+
+    // Species
+    if ($line[27]){
+
+      // JSON decode
+      $species = json_decode($line[27]);
+
+      // Loop
+      foreach ($species as $key => $specie) {
+
+        // Create new field collection item.
+        $field_collection_item = entity_create('field_collection_item', array('field_name' => 'field_species'));
+
+        // Attach it to the node.
+        $field_collection_item->setHostEntity('node', $node);
+
+        // Fill value for field_page_collection1_text1.
+        $field_collection_item->field_description[$node->language][0]['value'] = $specie->description;
+        $field_collection_item->field_description[$node->language][0]['format'] = 'full_html';
+
+        // Get image file
+        if ($file = csvimport_get_image($specie, $node->nid)){
+
+          // Set field
+          $field_collection_item->field_primary_image[LANGUAGE_NONE][$key] = (array)$file;
+        }
+
+        // Save field-collection item.
+        $field_collection_item->save();
+
+      }
+
+    }
+
+    // Tree number
+    if ($line[29]){
+      $node->field_sa_tree_number[$node->language][0]['value'] = $line[29];
+      $node->field_sa_tree_number[$node->language][0]['format'] = 'plain_text'; // Full html
+    }
+
+
+
+    // Save node
+    node_save($node);
+  }
+}
+
+
+function csvimport_get_image($image, $nid, &$context){
+
+  $src = $image->src;
+  $alt = $image->alt;
+
+  // Some file on our system
+  $file_path = drupal_realpath('data/images/' . $src);
+
+  // Create a File object
+  $file = (object) array(
+            'uid' => 1,
+            'uri' => $file_path,
+            'filemime' => file_get_mimetype($file_path),
+            'status' => 1,
+            'alt' => $alt,
+            'title' => $alt
+  );
+
+  if (file_exists($file->uri)){
+
+    // Create node directory
+    drupal_mkdir('public://images/plants/' . $nid);
+
+    // Save file
+    $file = file_copy($file, 'public://images/plants/' . $nid);
+
+    return $file;
+
+  }else{
+
+    // Missing images
+    $context['results']['missing_images'].= $nid . " (" . $file->uri . ")<br/>";
+
+    return false;
+
+  }
+
+
+}
+
+
+/**
+ * Process a line from the user CSV file.
+ */
+function csvimport_process_line_user($line, &$context){
+
+  // First see if the user already exists
+  $user = user_load_by_name($line[0]);
+  if(!$user){
+
+    // User doesn't exist
+    $new_user = array(
+      // 'uid' => $line[5],
+      'name' => $line[0],
+      'pass' => 'password',
+      'mail' => $line[3],
+      'status' => 1,
+      'field_first_name' => array(LANGUAGE_NONE => array(array('value' => $line[1]))),
+      'field_last_name' => array(LANGUAGE_NONE => array(array('value' => $line[2]))),
+      'field_location_checker' => array(LANGUAGE_NONE => array(array('value' => $line[4]))),
+      'access' => REQUEST_TIME,
+      'roles' => array()
+    );
+
+    // Save user
+    user_save(null, $new_user);
+
+  }else{
+
+    // User exists
+    $context['results']['user_exists'].= $line[0] . '.<br/>';
+    $context['results']['user_exists_count']+=1;
+  }
+}
+
+
+/**
+ * This puts the nid into the image urls
+ */
+function csvimport_insert_nid($nid, $value) {
+  $pattern = '/plant-node-id/i';
+  $replacement = $nid;
+  return preg_replace($pattern, $replacement, $value);
+}
+
+
+function csvimport_delete_attached_images($nid, &$context){
+
+  // Load the node
+  $node = node_load($nid);
+
+  // Get the language for the file field.
+  $lang = field_language('node', $node, 'field_primary_image');
+
+  // load the file
+  $file = file_load($node->field_primary_image[$lang][0]['fid']);
+
+
+  //$context['results']['filepaths'].= print_r($file, true) . "<br/>";
+
+  // unset the field for the node
+  unset($node->field_primary_image[$lang][0]);
+
+  // delete file from disk and from database
+  if (file_exists($file->uri)){
+    //$context['results']['filepaths'].= "File exists!";
+    file_delete($file);
+  } else {
+    //$context['results']['filepaths'].= "File does not exist!";
+  }
+
+  // Now remove secondary_images
+
+  // Get the language for the file field.
+  $lang = field_language('node', $node, 'field_secondary_images');
+
+  foreach ($node->field_secondary_images[$lang] as $key => $image) {
+
+    $file = file_load($image['fid']);
+
+    // unset the field for the node
+    unset($node->field_secondary_images[$lang][$key]);
+
+    // delete file from disk and from database
+    if (file_exists($file->uri)) file_delete($file);
+
+
+  }
+
+  // Save the node.
+  node_save($node);
+
+}

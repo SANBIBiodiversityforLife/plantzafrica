@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the Contact Page feature.
+ */
+
+include_once 'contact_page.features.inc';

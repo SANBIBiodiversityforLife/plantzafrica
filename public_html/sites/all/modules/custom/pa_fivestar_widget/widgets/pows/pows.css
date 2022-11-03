@@ -1,0 +1,45 @@
+/* Static View-only Star Version */
+.fivestar-pows div.fivestar-widget-static .star {
+  width: 17px;
+  height: 15px;
+  background: url(pows_star.png) no-repeat 0 0px;
+}
+
+.fivestar-pows div.fivestar-widget-static .star span.on {
+  background: url(pows_star.png) no-repeat 0 -32px;
+}
+
+.fivestar-pows div.fivestar-widget-static .star span.off {
+  background: url(pows_star.png) no-repeat 0 0px;
+}
+
+div.fivestar-widget .cancel{
+  display:none;
+}
+
+/* Javascript Star Version */
+.fivestar-pows div.fivestar-widget a{
+  -webkit-transition: none;-moz-transition: none;-o-transition: none;transition: none;
+}
+.fivestar-pows div.fivestar-widget .cancel,
+.fivestar-pows div.fivestar-widget .star {
+  width: 25px;
+  height: 25px;
+}
+.fivestar-pows div.fivestar-widget .cancel,
+.fivestar-pows div.fivestar-widget .cancel a {
+  background: url(pows_delete.png) no-repeat 0 0;
+}
+
+.fivestar-pows div.fivestar-widget .star,
+.fivestar-pows div.fivestar-widget .star a {
+  background: url(pows_star.png) no-repeat 0 0px;
+}
+
+.fivestar-pows div.fivestar-widget div.on a {
+  background-position: 0 -50px;
+}
+.fivestar-pows div.fivestar-widget div.hover a,
+.fivestar-pows div.rating div a:hover {
+  background-position: 0 -50px;
+}

@@ -1,0 +1,9 @@
+name = Google QR Block Settings
+description = Google QR Block Settings
+core = 7.x
+package = Features
+dependencies[] = fe_block
+dependencies[] = google_qr_code
+features[fe_block_settings][] = google_qr_code-qr_code
+features[features_api][] = api:2
+project path = sites/all/modules/custom

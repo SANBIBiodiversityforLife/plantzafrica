@@ -1,0 +1,82 @@
+<add-tree-conflict
+   name=""
+   data="((conflict settings.php file update edited deleted (version file:///usr/home/pzasawgfpm/repository 2 36 sites/default/settings.php 0 ) (version file:///usr/home/pzasawgfpm/repository 2 42 sites/default/settings.php file)))"/>
+<modify-entry
+   has-prop-mods="false"
+   has-props="false"
+   name="settings.php"
+   present-props=""/>
+<modify-entry
+   committed-rev="37"
+   committed-date="2015-09-01T07:15:45.461255Z"
+   name="settings.php"
+   last-author="pzasawgfpm"
+   uuid="c79b3b5d-8656-40b0-8f23-acda559c64e0"/>
+<modify-entry
+   text-time="1970-01-01T00:00:00.000000Z"
+   name="settings.php"
+   url="file:///usr/home/pzasawgfpm/repository/sites/default/settings.php"
+   kind="file"
+   deleted="false"
+   working-size="-1"
+   absent="false"
+   revision="42"/>
+<cp-and-translate
+   dest="settings.php"
+   name=".svn/tmp/settings.php.3.tmp"/>
+<maybe-executable
+   name="settings.php"/>
+<maybe-readonly
+   name="settings.php"/>
+<mv
+   name=".svn/tmp/text-base/settings.php.svn-base"
+   dest=".svn/text-base/settings.php.svn-base"/>
+<readonly
+   name=".svn/text-base/settings.php.svn-base"/>
+<modify-entry
+   schedule="delete"
+   name="settings.php"
+   checksum="3743d3b5388d2dcaa4a83fa53396d1d0"/>
+<modify-entry
+   has-prop-mods="false"
+   has-props="false"
+   name="default.settings.php"
+   present-props=""/>
+<modify-entry
+   committed-rev="42"
+   committed-date="2015-10-28T10:56:55.883238Z"
+   name="default.settings.php"
+   last-author="pzasawgfpm"
+   uuid="c79b3b5d-8656-40b0-8f23-acda559c64e0"/>
+<modify-entry
+   absent="false"
+   revision="42"
+   text-time="1970-01-01T00:00:00.000000Z"
+   name="default.settings.php"
+   url="file:///usr/home/pzasawgfpm/repository/sites/default/default.settings.php"
+   kind="file"
+   deleted="false"
+   working-size="-1"/>
+<cp-and-translate
+   dest="default.settings.php"
+   name=".svn/tmp/text-base/default.settings.php.svn-base"/>
+<mv
+   dest=".svn/text-base/default.settings.php.svn-base"
+   name=".svn/tmp/text-base/default.settings.php.svn-base"/>
+<readonly
+   name=".svn/text-base/default.settings.php.svn-base"/>
+<modify-entry
+   name="default.settings.php"
+   checksum="b8dbde9b46c425c85e96af7ff430101e"/>
+<modify-entry
+   name="default.settings.php"
+   text-time="working"/>
+<modify-entry
+   working-size="working"
+   name="default.settings.php"/>
+<modify-entry
+   committed-rev="42"
+   committed-date="2015-10-28T10:56:55.883238Z"
+   name=""
+   last-author="pzasawgfpm"
+   uuid="c79b3b5d-8656-40b0-8f23-acda559c64e0"/>

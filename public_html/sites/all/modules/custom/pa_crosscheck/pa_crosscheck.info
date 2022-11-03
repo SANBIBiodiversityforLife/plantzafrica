@@ -1,0 +1,4 @@
+name = PA Crosscheck
+description = Uses an CSV list of plants with their HTM files and searches for corresponding Plant nodes.
+package = Development
+core = 7.x

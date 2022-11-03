@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the General search feature.
+ */
+
+include_once 'general_search.features.inc';

@@ -1,0 +1,6 @@
+name = Plantz Africa - Transfer progress bar
+description = A CSS3 / jQuery progress bar for the homepage transfer progress widget
+dependencies[] = block
+package = Greenbox
+core = 7.x
+files[] = tests/pa_transfer_progress.test

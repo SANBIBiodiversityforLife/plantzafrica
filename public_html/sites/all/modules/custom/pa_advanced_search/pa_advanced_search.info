@@ -1,0 +1,7 @@
+name = Plantz Africa advanced search
+description = Advanced search functionality for plant listings
+dependencies[] = search_api
+dependencies[] = search_api_solr
+package = Greenbox
+core = 7.x
+files[] = tests/pa_advanced_search.test

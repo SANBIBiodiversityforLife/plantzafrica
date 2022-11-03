@@ -1,0 +1,9 @@
+name = AddToAny Block Settings
+description = AddToAny Block Settings
+core = 7.x
+package = Features
+dependencies[] = addtoany
+dependencies[] = fe_block
+features[fe_block_settings][] = addtoany-addtoany_button
+features[features_api][] = api:2
+project path = sites/all/modules/custom

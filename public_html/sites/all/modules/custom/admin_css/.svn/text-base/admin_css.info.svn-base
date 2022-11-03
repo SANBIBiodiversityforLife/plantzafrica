@@ -1,0 +1,5 @@
+;; $Id: node_import.info,v 1.1.4.5 2009/01/15 16:39:19 robrechtj Exp $
+name = Admin CSS tweaks
+description = Allows us to override the admin theme CSS without hacking theme "core"
+package = Administration
+core = 7.x

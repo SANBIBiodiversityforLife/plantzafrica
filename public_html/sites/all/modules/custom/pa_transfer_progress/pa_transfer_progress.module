@@ -1,0 +1,56 @@
+<?php
+
+/**
+ * @file pa_transfer_progress.module
+ * Provides a progress bar within the News & Updates block on the homepage
+ */
+
+/**
+ * Implements hook_block_view_alter().
+ */
+function pa_transfer_progress_block_view_alter(&$data, $block) {
+  //check that we're altering the correct home page block
+  if($block->region == 'sidebar_second' && $block->pages == '<front>' && strpos($block->title, 'News') !== FALSE){
+
+    //calculate the progress
+    $percentage = pa_transfer_progress_calculate();
+
+    //add our JS
+    drupal_add_js(drupal_get_path('module', 'pa_transfer_progress') . '/scripts/pa_transfer_progress.js');
+    drupal_add_js(array('progress' => $percentage), 'setting');
+
+    $data['content'] = str_replace('<p>[progress-bar-token]</p>', '<div id="progressBar"><div></div></div>', $data['content']);
+  }
+}
+
+/**
+ * Function which determind the transfer progress as a percentage
+ */
+function pa_transfer_progress_calculate(){
+
+  //cache the results if block hooks running more than once
+  $data = &drupal_static(__FUNCTION__);
+
+  if(!isset($data)){
+    //create EFQ object
+    $query = new EntityFieldQuery();
+
+    $query
+      ->entityCondition('entity_type', 'node')
+      ->entityCondition('bundle', 'plant') //plant bundle
+      ->count();
+
+    //query total number of plants
+    $total = $query->execute();
+
+    //Add published condition
+    $query->propertyCondition('status', 1);
+
+    //query total number of published plants
+    $published = $query->execute();
+
+    $percentage = ceil(($published / $total) * 100);
+  }
+
+  return $percentage;
+}

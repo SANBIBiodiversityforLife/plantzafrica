@@ -1,0 +1,189 @@
+<?php
+
+/**
+ * @file pa_update_captions.module
+ * TODO: Enter file description here.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function pa_update_captions_menu() {
+  $items = array();
+
+  //landing page route
+  $items['reuben/captions'] = array(
+    'title' => 'Captions update module',
+    'page callback' => 'pa_update_captions_landing_page',
+    'access arguments' => array('administer taxonomy'),
+    'type' => MENU_CALLBACK,
+  );
+
+  //perform import route
+  $items['reuben/captions/update'] = array(
+    'title' => 'Performing update...',
+    'page callback' => 'pa_update_captions_update_callback',
+    'access arguments' => array('administer taxonomy'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Callback for Reubens landing page.
+ */
+function pa_update_captions_landing_page(){
+
+  $content = '<p>Click the link below to start the captions update</p>';
+  $link = l('Start update', 'reuben/captions/update');
+  $content .= $link;
+
+  return array(
+    '#markup' => $content,
+  );
+}
+
+function GetCaptionFreeText($txt) {
+  $newtxt = $txt;
+  $startpos = stripos($txt,'<figcaption>');
+  $endpos = stripos($txt,'</figcaption>');
+  if ($startpos && $endpos) {
+    $endpos = $endpos + strlen("</figcaption>");         
+    $newtxt = substr($txt,0,$startpos) . substr($txt,$endpos);    
+  }
+  return $newtxt;
+}
+
+/**
+ * Callback for running Reubens import
+ */
+function pa_update_captions_update_callback(){
+  $fields_to_strip = array(
+      'field_credits',
+      'field_description',
+      'field_distribution_description',
+      'field_ecology',
+      'field_grow',
+      'field_status',
+      'field_history',
+      'field_introduction',
+      'field_long_scientific_name',
+      'field_use');
+  
+  
+  $content = '<p><strong>Results:</strong><br/>';
+    
+  $query = new EntityFieldQuery();
+
+  $query->entityCondition('entity_type', 'node')
+        ->entityCondition('bundle', 'plant');
+        //->propertyCondition('status', 1); //only published plants
+
+  $result = $query->execute();
+
+  if (!empty($result['node'])) {
+    $nids = array_keys($result['node']);
+
+    $no_done = 0;
+    foreach ($nids as $nid) {
+      $node = node_load($nid, NULL, TRUE);
+      $changed = 0;
+      $changed_txt = 0;
+      $content .= "Plant #" . $node->nid . " " . $node->title . " " . $node->status;
+      
+      if ($node->field_credits['und'][0]['format'] == 'full_html')                   { $changed=1; $node->field_credits['und'][0]['format'] = 'filtered_html'; }
+      if ($node->field_description['und'][0]['format'] == 'full_html')               { $changed=2; $node->field_description['und'][0]['format'] = 'filtered_html'; }
+      if ($node->field_distribution_description['und'][0]['format'] == 'full_html')  { $changed=3; $node->field_distribution_description['und'][0]['format'] = 'filtered_html'; }
+      if ($node->field_ecology['und'][0]['format'] == 'full_html')                   { $changed=4; $node->field_ecology['und'][0]['format'] = 'filtered_html'; }
+      if ($node->field_grow['und'][0]['format'] == 'full_html')                      { $changed=5; $node->field_grow['und'][0]['format'] = 'filtered_html'; }
+      if ($node->field_status['und'][0]['format'] == 'full_html')                    { $changed=6; $node->field_status['und'][0]['format'] = 'filtered_html'; }
+      if ($node->field_history['und'][0]['format'] == 'full_html')                   { $changed=7; $node->field_history['und'][0]['format'] = 'filtered_html'; }
+      if ($node->field_introduction['und'][0]['format'] == 'full_html')              { $changed=8; $node->field_introduction['und'][0]['format'] = 'filtered_html'; }
+      if ($node->field_long_scientific_name['und'][0]['format'] == 'full_html')      { $changed=9; $node->field_long_scientific_name['und'][0]['format'] = 'filtered_html'; }
+      if ($node->field_use['und'][0]['format'] == 'full_html')                       { $changed=10; $node->field_use['und'][0]['format'] = 'filtered_html'; }
+      if ($node->field_references['und'][0]['format'] == 'full_html')                { $changed=11; $node->field_references['und'][0]['format'] = 'filtered_html'; }
+      
+      $startpos = 0;
+      $endpos = 0;      
+      if ($node->status == 1) { //published, so strip out figure captions
+        $txt = $node->field_credits['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_credits['und'][0]['value'] = $newtxt; }
+        
+        $txt = $node->field_description['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_description['und'][0]['value'] = $newtxt; }
+        
+        $txt = $node->field_distribution_description['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_distribution_description['und'][0]['value'] = $newtxt; }
+        
+        $txt = $node->field_ecology['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_ecology['und'][0]['value'] = $newtxt; }
+        
+        $txt = $node->field_grow['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_grow['und'][0]['value'] = $newtxt; }
+        
+        $txt = $node->field_status['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_status['und'][0]['value'] = $newtxt; }
+        
+        $txt = $node->field_history['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_history['und'][0]['value'] = $newtxt; }
+        
+        $txt = $node->field_introduction['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_introduction['und'][0]['value'] = $newtxt; }
+        
+        $txt = $node->field_long_scientific_name['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_long_scientific_name['und'][0]['value'] = $newtxt; }
+        
+        $txt = $node->field_use['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_use['und'][0]['value'] = $newtxt; }     
+        
+        $txt = $node->field_references['und'][0]['value'];
+        $newtxt = GetCaptionFreeText($txt);
+        if ($newtxt != $txt) {$changed_txt = 1; $node->field_references['und'][0]['value'] = $newtxt; }     
+      }
+      
+      if ($changed || $changed_txt) {
+        node_save($node);
+        $no_done++;
+        if ($node->nid) {
+          $content .= " fixed " . ($changed? "full html " . $changed : "") . ($changed_txt? "captions" : "");
+        } else {
+          $content .= " *** could not save ***";
+        }
+      }
+      
+       /* 
+      $item = array($node);
+      foreach ($fields_to_strip as $field_to_do) {
+        foreach ($item['0'] as $field => $value) {
+          if ($field == $field_to_do) {
+            if ($value['und'][0]['format'] == 'filtered_html') {
+              $content .= $field_to_do . " format ok<br/>";
+            } else {
+              
+            }
+            if (stripos($value['und'][0]['value'],'<figcaption>')) $content .= $field_to_do . " has figcaption<br/>";
+          }
+        }
+      }*/
+      $content .= "<br/>";
+      if ($no_done == 200) break;
+    }
+  }
+  
+	
+
+  return array(
+    '#markup' => $content,
+  );
+}

@@ -1,0 +1,76 @@
+<?php
+
+/**
+ * @file pa_user_workflow.module
+ * TODO: Enter file description here.
+ */
+
+module_load_include('inc', 'pa_user_workflow', '/includes/pa_user_workflow.forms');
+module_load_include('inc', 'pa_user_workflow', '/includes/pa_user_workflow.blocks');
+module_load_include('inc', 'pa_user_workflow', '/includes/pa_user_workflow.theme');
+module_load_include('inc', 'pa_user_workflow', '/includes/pa_user_workflow.mail');
+
+/**
+ * Implements hook_menu().
+ */
+function pa_user_workflow_menu() {
+  $items = array();
+  
+  //user login AJAX route
+  $items['modal/login'] = array(
+    'page callback' => 'pa_user_workflow_login',
+    'access arguments' => array('access content'),
+    'file' => 'includes/pa_user_workflow.json.inc',
+    'type' => MENU_CALLBACK
+  );
+
+  //user registration AJAX route
+  $items['modal/register'] = array(
+    'page callback' => 'pa_user_workflow_register',
+    'access arguments' => array('access content'),
+    'file' => 'includes/pa_user_workflow.json.inc',
+    'type' => MENU_CALLBACK
+  );
+
+  //callback to verify user via email link
+  $items['signup/verify/%/%/%'] = array(
+    'title' => 'Activate your Plantz Africa account',
+    'page callback' => 'pa_user_workflow_verify_account',
+    'page arguments' => array(2, 3, 4),
+    'access callback' => 'pa_user_workflow_registeration_access',
+    'access arguments' => array(2, 3, 4),
+    'file' => 'includes/pa_user_workflow.pages.inc',
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * @description Access callback to validate tokens for Doctor practice info submissions
+ */
+function pa_user_workflow_registeration_access($user_id, $timestamp, $hash){
+
+  $account = user_load($user_id);
+
+  //check if valid user link by comparing hash
+  if(user_pass_rehash($account->pass, $timestamp, $account->login) == $hash && in_array('processing', $account->roles)){
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+/**
+ * Custom form submit handler for resetting passwords.
+ */
+function pa_user_workflow_pass_reset($form, &$form_state) {
+  global $language;
+  $account = $form_state['values']['account'];
+  // Mail one time login URL and instructions using current language.
+  _user_mail_notify('password_reset', $account, $language);
+  watchdog('user', 'Password reset instructions mailed to %name at %email.', array('%name' => $account->name, '%email' => $account->mail));
+  drupal_set_message(t('Further instructions have been sent to your e-mail address. Please remember to check your spam folder if you don\'t receive our email in a few minutes.'));
+  $form_state['redirect'] = 'user/password';
+  return;
+}

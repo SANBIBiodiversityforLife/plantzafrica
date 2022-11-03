@@ -1,0 +1,4 @@
+name = Plantz Africa forms
+description =  All form related stuff
+package = Greenbox
+core = 7.x

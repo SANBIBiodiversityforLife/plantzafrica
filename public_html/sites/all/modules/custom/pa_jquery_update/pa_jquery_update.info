@@ -1,0 +1,4 @@
+name = Plantz Africa jQuery Updater
+description = Replaces old legacy jQuery and jQuery UI scripts with versions jquery-1.10.2 + jquery-ui-1.10.3
+core = 7.x
+package = Greenbox

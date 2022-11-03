@@ -1,0 +1,135 @@
+<?php
+
+/**
+ * @file pa_update_synchnames.module
+ * TODO: Enter file description here.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function pa_update_synchnames_menu() {
+  $items = array();
+
+  //landing page route
+  $items['reuben/synchnames'] = array(
+    'title' => 'Reubens plant synchnames update module',
+    'page callback' => 'pa_update_synchnames_landing_page',
+    'access arguments' => array('administer taxonomy'),
+    'type' => MENU_CALLBACK,
+  );
+
+  //perform import route
+  $items['reuben/synchnames/import'] = array(
+    'title' => 'Performing import...',
+    'page callback' => 'pa_update_synchnames_import_callback',
+    'access arguments' => array('administer taxonomy'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Callback for Reubens landing page.
+ */
+function pa_update_synchnames_landing_page(){
+
+  $content = '<p>Click the link below to start the plant synchnames update</p>';
+  $link = l('Start Import', 'reuben/synchnames/import');
+  $content .= $link;
+
+  return array(
+    '#markup' => $content,
+  );
+}
+
+/**
+ * Callback for running Reubens import
+ */
+function pa_update_synchnames_import_callback(){
+
+  //nid	SynchName
+  $synchname_data = array(
+   array(9635, "Senegalia galpinii (Burtt Davy) Seigler & Ebinger","naked name omitted"),
+array(9636, "Vachellia hebeclada (DC.) Kyal. & Boatwr. subsp. hebeclada","naked name omitted"),
+array(9643, "Vachellia sieberiana (DC.) Kyal. & Boatwr. var. woodii (Burtt Davy) Kyal. & Boatwr.","naked name omitted"),
+array(9691, "Aloidendron barberae (Dyer) Klopper & Gideon F.Sm.","naked name omitted"),
+array(9699, "Aloiampelos commixta (A.Berger) Klopper & Gideon F.Sm.","naked name omitted"),
+array(9725, "Aloe ferox Mill.","naked name omitted"),
+array(9727, "Aloidendron pillansii (L.Guthrie) Klopper & Gideon F.Sm.","naked name omitted"),
+array(11573, "Aloe karasbergensis Pillans","naked name omitted"),
+array(9734, "Aloe komaggasensis Kritz. & Van Jaarsv.","naked name omitted"),
+array(9770, "Artemisia afra Jacq. ex Willd. var. afra","naked name omitted"),
+array(9779, "Afroaster laevigatus (Sond.) J.C.Manning & Goldblatt","naked name omitted"),
+array(9809, "Barleria taitensis S.Moore subsp. rogersii (S.Moore) I.Darbysh.","naked name omitted"),
+array(9910, "Chasmanthe floribunda (Salisb.) N.E.Br.","naked name omitted"),
+array(10080, "Cleretum bellidiforme (Burm.f.) G.D.Rowley","naked name omitted"),
+array(10191, "Erica cumuliflora Salisb.","naked name omitted"),
+array(10204, "Eriocephalus africanus L. var. paniculatus (Cass.) M.A.N.Müll., P.P.J.Herman & Kolberg","naked name omitted"),
+array(11671, "Eriocephalus africanus L. var. paniculatus (Cass.) M.A.N.Müll., P.P.J.Herman & Kolberg","naked name omitted"),
+array(10338, "Lasiosiphon triplinervis (Meisn.) Decne.","naked name omitted"),
+array(10435, "Restio subverticillatus (Steud.) Mast.","naked name omitted"),
+array(10456, "Kedrostis leloja (Forssk.) C.Jeffrey","naked name omitted"),
+array(10498, "Codonorhiza corymbosa (L.) Goldblatt & J.C.Manning","naked name omitted"),
+array(10552, "Drimia uniflora J.C.Manning & Goldblatt","naked name omitted"),
+array(10565, "Leobordea divaricata Eckl. & Zeyh.","naked name omitted"),
+array(11314, "Sceletium varians (Haw.) Gerbaulet","naked name omitted"),
+array(10635, "Osteospermum ilicifolium L.","naked name omitted"),
+array(10650, "Muraltia scoparia (Eckl. & Zeyh.) Levyns [1]","naked name omitted"),
+array(10651, "Muraltia spinosa (L.) F.Forest & J.C.Manning","naked name omitted"),
+array(10680, "Colpoon compressum P.J.Bergius","naked name omitted"),
+array(10763, "Notobubon capense (Eckl. & Zeyh.) Magee","naked name omitted"),
+array(10805, "Afrocarpus falcatus (Thunb.) C.N.Page","naked name omitted"),
+array(10861, "Brunia trigyna (Schltr.) Class.-Bockh. & E.G.H.Oliv.","naked name omitted"),
+array(10878, "Searsia chirindensis (Baker f.) Moffett","naked name omitted"),
+array(10879, "Searsia dentata (Thunb.) F.A.Barkley","naked name omitted"),
+array(11621, "Merwilla plumbea (Lindl.) Speta","naked name omitted"),
+array(10940, "Caputia tomentosa (Hutch.) B.Nord. & Pelser","naked name omitted"),
+array(10945, "Caputia medley-woodii (Hutch.) B.Nord. & Pelser","naked name omitted"),
+array(11645, "Streptocarpus meyeri B.L.Burtt","naked name omitted"),
+array(11087, "Ursinia chrysanthemoides (Less.) Harv.","naked name omitted"),
+array(11095, "Hilliardiella hirsuta (DC.) H.Rob.","naked name omitted"),
+array(11622, "Hilliardiella aristata (DC.) H.Rob.","naked name omitted"),
+array(11097, "Hilliardiella oligocephala (DC.) H.Rob.","naked name omitted"),
+  );
+
+  $content = '<p><strong>Results:</strong>';
+  
+	$last_nid = 0;
+	$last_name = '';
+	foreach ($synchname_data as $triple) {		
+		$nid = $triple[0];
+		$name = $triple[1];
+		$nakedname = $triple[2];
+		if ($last_nid != $nid) {
+			if ($last_nid != 0) {				
+				node_save($node);
+				if ($node->nid) {
+					$content .= "<p>Set node " . $last_nid . " synch name " . $last_name . "</p>";
+				} else {
+					$content .= "<p>Error saving node " . $last_nid . " synch name " . $last_name . "</p>";
+				}
+			}			
+			$node = node_load($nid);
+			$last_nid = $nid;
+			$last_name = $name;
+		}
+		$entity_property_value_array = array();
+		$entity_property_value_array['value'] = $name;
+		$entity_property_value_array['format'] = ''; //$nakedname
+		$node->field_synched_scientific_name['und'][0] = $entity_property_value_array;		
+	}
+	if ($last_nid != 0) {		
+		node_save($node);
+		if ($node->nid) {
+			$content .= "<p>Set node " . $last_nid . " synch name " . $last_name . "</p>";
+		} else {
+			$content .= "<p>Error saving node " . $last_nid . " synch name " . $last_name . "</p>";
+		}
+	}
+
+  return array(
+    '#markup' => $content,
+  );
+}

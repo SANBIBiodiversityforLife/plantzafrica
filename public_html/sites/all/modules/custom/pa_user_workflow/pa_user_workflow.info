@@ -1,0 +1,4 @@
+name = Plantz Africa user workflow
+description = Bootstrap modal login / registration user workflow
+package = Greenbox
+core = 7.x

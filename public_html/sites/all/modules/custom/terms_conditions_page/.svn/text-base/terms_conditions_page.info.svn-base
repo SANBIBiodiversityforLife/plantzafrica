@@ -1,0 +1,12 @@
+name = Terms & Conditions Page
+description = Terms & Conditions Page
+core = 7.x
+package = Features
+dependencies[] = content_type_vegetation
+dependencies[] = features
+dependencies[] = filefield_paths
+dependencies[] = node_export_features
+features[features_api][] = api:2
+features[node_export_features][] = 5cb3946e-9553-4808-8725-24a24b500d73
+features_exclude[dependencies][node_export_features] = node_export_features
+project path = sites/all/modules/custom

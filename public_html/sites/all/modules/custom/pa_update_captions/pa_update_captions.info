@@ -1,0 +1,5 @@
+name = Plantz Africa Captions updater
+description = A custom module removing captions from published plants, and setting fields to Filtered HTML for all plants
+package = Greenbox
+core = 7.x
+files[] = tests/pa_update_captions.test

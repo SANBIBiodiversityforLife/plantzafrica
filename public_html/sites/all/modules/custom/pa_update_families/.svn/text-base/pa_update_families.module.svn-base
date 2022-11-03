@@ -1,0 +1,149 @@
+<?php
+
+/**
+ * @file pa_update_families.module
+ * TODO: Enter file description here.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function pa_update_families_menu() {
+  $items = array();
+
+  //landing page route
+  $items['reuben/families'] = array(
+    'title' => 'Reubens plant family update module',
+    'page callback' => 'pa_update_families_landing_page',
+    'access arguments' => array('administer taxonomy'),
+    'type' => MENU_CALLBACK,
+  );
+
+  //perform import route
+  $items['reuben/families/import'] = array(
+    'title' => 'Performing import...',
+    'page callback' => 'pa_update_families_import_callback',
+    'access arguments' => array('administer taxonomy'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Callback for Reubens landing page.
+ */
+function pa_update_families_landing_page(){
+
+  $content = '<p>Click the link below to start the plant families update</p>';
+  $link = l('Start Import', 'reuben/families/import');
+  $content .= $link;
+
+  return array(
+    '#markup' => $content,
+  );
+}
+
+/**
+ * Callback for running Reubens import
+ */
+function pa_update_families_import_callback(){
+
+  //nid	Family
+  $family_data = array(
+array(9755, 2456),
+array(9766, 2456),
+array(9791, 2822),
+array(9837, 2822),
+array(9860, 2414),
+array(9861, 2414),
+array(9862, 2414),
+array(9863, 2414),
+array(9864, 2414),
+array(9876, 2822),
+array(9891, 2456),
+array(9893, 2456),
+array(9900, 2456),
+array(9912, 2456),
+array(9915, 3211),
+array(9916, 3211),
+array(9920, 2822),
+array(9922, 2822),
+array(9952, 2456),
+array(9953, 2456),
+array(9955, 2456),
+array(9956, 2456),
+array(9736, 2404),
+array(10044, 2456),
+array(10084, 3217),
+array(10087, 2456),
+array(10089, 2456),
+array(10090, 2456),
+array(10091, 2456),
+array(10092, 2456),
+array(10093, 2456),
+array(10151, 2456),
+array(10277, 2456),
+array(10278, 2456),
+array(10335, 2456),
+array(10342, 2414),
+array(10351, 2436),
+array(10352, 2436),
+array(10353, 2436),
+array(10364, 3214),
+array(10443, 2456),
+array(10445, 2456),
+array(10490, 2456),
+array(10491, 2456),
+array(10492, 2456),
+array(10494, 2456),
+array(10495, 2456),
+array(10496, 2456),
+array(10553, 2456),
+array(10555, 2456),
+array(10570, 2822),
+array(10675, 2456),
+array(10676, 2456),
+array(10677, 2456),
+array(10798, 2456),
+array(10891, 2456),
+array(10982, 2397),
+array(10984, 2456),
+array(10986, 2456),
+array(10987, 2456),
+array(11019, 2447),
+array(11020, 2447),
+array(11021, 2447),
+array(11022, 2447),
+array(11070, 2456),
+array(11124, 3215),
+array(11319, 2421),
+array(11349, 2531),
+array(11524, 3217),
+array(11550, 3217),
+
+  );
+
+  $content = '<p><strong>Results:</strong>';
+  
+	foreach ($family_data as $tuple) {		
+		$nid = $tuple[0];
+		$tid = $tuple[1];
+		$node = node_load($nid);
+		/* echo "<pre>";
+		print_r($node);
+		echo "</pre>";
+		exit; */
+		$node->field_family['und'][0] = array('tid' => $tid);	
+		node_save($node);
+		if ($node->nid) {
+			$content .= "<p>Set node " . $nid . " family tid " . $tid . "</p>";
+		} else {
+			$content .= "<p>Error saving node " . $nid . " family tid " . $tid . "</p>";
+		}		
+	}
+
+  return array(
+    '#markup' => $content,
+  );
+}

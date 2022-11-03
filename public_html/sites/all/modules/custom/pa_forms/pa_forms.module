@@ -1,0 +1,187 @@
+<?php
+
+module_load_include('inc', 'pa_forms', '/includes/pa_forms.blocks');
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function pa_forms_form_alter(&$form, &$form_state, $form_id){
+
+  // RR for front page user registration honey-pot:
+  
+  if ($form['#id'] == 'pa-user-workflow-register-form') {
+    honeypot_add_form_protection($form, $form_state, array('honeypot', 'time_restriction'));
+  }
+  
+  //Views exposed form info library
+  if ($form['#id'] == 'views-exposed-form-information-library-page-1'){
+    $form['is']['#attributes']['placeholder'] = 'Search our information library for articles and documents';
+  }
+
+  // Contact webform
+  if (substr($form['#action'], -8)  == '/contact' && substr($form['#form_id'], 0, 19) == 'webform_client_form') {
+
+    // Add classes to form elements
+    $form['submitted']['name']['#attributes']['class'][] = 'txtfield';
+    $form['submitted']['email']['#attributes']['class'][] = 'txtfield';
+    $form['submitted']['phone_number']['#attributes']['class'][] = 'txtfield';
+    $form['submitted']['message']['#attributes']['class'][] = 'txtfield';
+    $form['actions']['submit']['#attributes']['class'][] = 'submit-btn';
+
+    // Add placeholders to form elements
+    $form['submitted']['name']['#attributes']['placeholder'] = 'Name';
+    $form['submitted']['email']['#attributes']['placeholder'] = 'Email';
+    $form['submitted']['phone_number']['#attributes']['placeholder'] = 'Phone number';
+    $form['submitted']['message']['#attributes']['placeholder'] = 'Message';
+    $form['captcha']['#after_build'][] = 'pa_forms_alter_captcha'; // use this custom function to do it because the captcha placeholder gets overridden by the captcha module
+
+    // Add custom asterix for required fields (Email and Message)
+    $form['submitted']['email']['#prefix'] = '<span class="req-field">*</span>';
+    $form['submitted']['message']['#prefix'] = '<span class="req-field">*</span>';
+
+    // Custom text for submit button
+    $form['actions']['submit']['#value'] = 'Submit query';
+
+  }
+
+  // Plant comments form
+  if (isset($form['#node']) && $form_id == 'comment_node_plant_form') {
+
+    $form['comment_body'][LANGUAGE_NONE][0]['#attributes']['placeholder'] = 'Your comment here'; // Comment body
+    $form['actions']['submit']['#value'] = t('Submit comment'); // Submit button
+    $form['field_terms_and_conditions']['und']['#title'] = 'I agree to the <a href="' . base_path() . 'comment-terms-conditions">terms and conditions.</a>'; // T&C's .  RR was terms-conditions but Yvonnes page has a different url
+    $form['field_image']['und']['#file_upload_title'] = 'Want to add images? (5 max.)'; // Images
+
+    // Add a custom submit handler to act when the form submits.
+    $form['#action'] = "http://" . $_SERVER['HTTP_HOST'] . base_path() . drupal_get_path_alias('node/' . $form['#node']->nid);
+  }
+
+  //Exposed general search form input
+  if($form_id == 'views_exposed_form' && $form['#id'] == 'views-exposed-form-general-search-page'){
+
+    global $theme;
+
+    //if not admin theme being viewed
+    if($theme != 'seven'){
+      //add our autocomplete scripts and CSS
+      drupal_add_js(drupal_get_path('module', 'pa_autocomplete') . '/scripts/pa_autocomplete.general.js');
+      drupal_add_css(drupal_get_path('module', 'pa_autocomplete') . '/css/pa_autocomplete.css');
+
+      /* div wrapper for theming */
+      $form['#prefix'] = '<div class="field">';
+      $form['#suffix'] = '</div>';
+
+      //add HTML 5 placeholder values
+      $form['s']['#attributes'] = array(
+        'placeholder' => 'General site search',
+        'class' => array('autocomplete-general txtfield'),
+      );
+
+      $form['submit']['#attributes']['class'] = array('search-btn');
+    }
+  }
+
+  //Information Lib exposed form
+  if($form_id == 'views_exposed_form' && $form['#id'] == 'views-exposed-form-information-library-search-results'){
+    //force form to submit back to landing page with no View args
+    $form['#action'] = '/information-library/search';
+    $form['is']['#attributes'] = array(
+      'placeholder' => 'Search our information library for articles and documents'
+    );
+  }
+
+  //Password reset request form
+  if($form_id == 'user_pass'){
+
+    $form['name']['#prefix'] = '<p>Please complete the form below, and we will send you instructions for resetting your password.</p><br/>';
+    $form['name']['#title'] = 'Email address';
+    $form['name']['#attributes'] = array(
+      'placeholder' => 'Email address'
+    );
+
+    $form['actions']['submit']['#attributes']['class'][] = 'submit-btn';
+    $form['actions']['submit']['#value'] = 'Reset password';
+
+    $form['#submit'] = array('pa_user_workflow_pass_reset');
+  }
+
+  //Password account form
+  if($form_id == 'user_profile_form'){
+    $form['#prefix'] = '<p>Please complete your details below to unlock your PlantZAfrica account.</p><br/>';
+    $form['actions']['submit']['#attributes']['class'][] = 'submit-btn';
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * We use this to add our custom javascript to the node edit form for the Insert "snap" functionality.
+ */
+function pa_forms_form_node_form_alter(&$form, $form_state) {
+  drupal_add_css(drupal_get_path('module', 'pa_forms') . '/css/pa_forms.insert.css');
+  drupal_add_js(drupal_get_path('module', 'pa_forms') . '/scripts/pa_forms.insert.js');
+  //for 'back to top' button on plant edit pages
+  $form['field_editor_comments']['#suffix'] = t('<div style="clear:both;width:100%;display:inline-block"><a class="backtop-btn" href="#">Back to top</a></div>');  
+}
+
+/**
+ * Implement hook_preprocess_html().
+ */
+function pa_forms_preprocess_html($variables){
+
+  global $theme_key;
+
+  //krumo($javascript);
+
+  //if not admin theme or admin path
+  if(!path_is_admin(current_path()) && $theme_key !== variable_get('admin_theme', 'seven')){
+    //add our degregation placeholder scripts
+    drupal_add_js(drupal_get_path('module', 'pa_forms') . '/scripts/placeholders.jquery.min.js', array('weight' => JS_LIBRARY));
+
+    //add our util script
+    drupal_add_js(drupal_get_path('module', 'pa_forms') . '/scripts/greenbox_jquery_utils.js', array('weight' => JS_LIBRARY));
+
+    //add parsleyjs which validates our forms in a sexy way for us
+    if ($path = libraries_get_path('parsleyjs')) {
+      drupal_add_js($path . '/parsley.min.js', array('weight' => JS_LIBRARY));
+    }
+
+    //add jQuery chosen library for our awesome select elements
+    if ($path = libraries_get_path('chosen')) {
+      drupal_add_css($path . '/chosen.min.css');
+      drupal_add_js($path . '/chosen.jquery.min.js', array('weight' => JS_LIBRARY));
+    }
+
+    //add jQuery qTip lib
+    if ($path = libraries_get_path('qtip2')) {
+      drupal_add_css($path . '/jquery.qtip.min.css');
+      drupal_add_js($path . '/jquery.qtip.min.js', array('weight' => JS_LIBRARY));
+    }
+  }
+}
+
+/**
+ * Custom function to set the placeholder value for the captcha field
+ */
+function pa_forms_alter_captcha(&$element) {
+  $element['captcha_widgets']['captcha_response']['#title'] = 'CAPTCHA image';
+  $element['captcha_widgets']['captcha_response']['#attributes']['placeholder'] = t('Enter the characters shown in the image');
+  $element['captcha_widgets']['captcha_response']['#prefix'] = '<span class="req-field">*</span>';
+  return $element;
+}
+
+/**
+ * Implements hook_ckeditor_link_autocomplete_alter(&$results, $string)
+ * Overriding the autocomplete suggested CKEditor links (link button via toolbar)
+ */
+function pa_forms_ckeditor_link_autocomplete_alter(&$results, $string){
+  //loop through results to get their content type
+  foreach($results as $path => $title){
+    $tmp = explode('/', $path);
+    $nid = $tmp[1];
+    $query = db_query('SELECT type FROM {node} WHERE nid = ' . $nid);
+    $type = $query->fetchField();
+    $type = ucfirst($type);
+    $type = str_replace('_', ' ', $type);
+    $results[$path] = '(' . $type . ') ' . $title;
+  }
+}

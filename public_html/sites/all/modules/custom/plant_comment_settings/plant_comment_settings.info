@@ -1,0 +1,15 @@
+name = Plant Comment Settings
+description = Plant Comment Settings
+core = 7.x
+package = Features
+dependencies[] = features
+dependencies[] = filefield_paths
+dependencies[] = image
+dependencies[] = list
+dependencies[] = options
+features[features_api][] = api:2
+features[field_base][] = field_terms_and_conditions
+features[field_instance][] = comment-comment_node_plant-field_image
+features[field_instance][] = comment-comment_node_plant-field_terms_and_conditions
+features_exclude[field_base][field_image] = field_image
+project path = sites/all/modules/custom

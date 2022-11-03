@@ -1,0 +1,11 @@
+name = Plant voting
+description = Provides mechanism for voting on POW criteria
+core = 7.x
+package = Voting API
+dependencies[] = features
+dependencies[] = fivestar
+dependencies[] = plant_settings
+dependencies[] = votingapi
+features[features_api][] = api:2
+features[user_permission][] = rate content
+project path = sites/all/modules/custom
